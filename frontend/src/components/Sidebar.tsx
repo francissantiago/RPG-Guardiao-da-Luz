@@ -1,8 +1,8 @@
 import type { Character } from '../types';
 
 interface SidebarProps {
-  currentView: 'create' | 'view' | 'enemies' | 'dice';
-  setCurrentView: (view: 'create' | 'view' | 'enemies' | 'dice') => void;
+  currentView: 'create' | 'view' | 'enemies' | 'dice' | 'maps';
+  setCurrentView: (view: 'create' | 'view' | 'enemies' | 'dice' | 'maps') => void;
   characters: Character[];
   addXp: (id: number, amount: number) => void;
   levelUp: (id: number) => void;
@@ -17,6 +17,7 @@ export default function Sidebar({ currentView, setCurrentView, characters, addXp
         <li><button className={`w-full text-left p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded ${currentView === 'view' ? 'bg-gray-300 dark:bg-gray-600' : ''} text-gray-900 dark:text-white`} onClick={() => setCurrentView('view')}>Ver Personagens</button></li>
         <li><button className={`w-full text-left p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded ${currentView === 'enemies' ? 'bg-gray-300 dark:bg-gray-600' : ''} text-gray-900 dark:text-white`} onClick={() => setCurrentView('enemies')}>Ver Inimigos</button></li>
         <li><button className={`w-full text-left p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded ${currentView === 'dice' ? 'bg-gray-300 dark:bg-gray-600' : ''} text-gray-900 dark:text-white`} onClick={() => setCurrentView('dice')}>🎲 Rolar Dados</button></li>
+        <li><button className={`w-full text-left p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded ${currentView === 'maps' ? 'bg-gray-300 dark:bg-gray-600' : ''} text-gray-900 dark:text-white`} onClick={() => setCurrentView('maps')}>🗺️ Gerar Mapas</button></li>
         <li><button className="w-full text-left p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-white">Configurações</button></li>
       </ul>
       {currentView === 'create' && (
