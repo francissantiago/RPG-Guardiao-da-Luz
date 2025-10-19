@@ -63,7 +63,12 @@ function App() {
         const equipped: { [key: string]: Item | null } = {
           head: null,
           body: null,
-          hands: null,
+          hands: {
+            id: -1, // ID especial para weapon
+            name: char.weapon_name,
+            type: 'weapon',
+            bonus: { attr: char.weapon_attr, value: char.weapon_bonus },
+          },
           legs: null,
           feet: null,
         };

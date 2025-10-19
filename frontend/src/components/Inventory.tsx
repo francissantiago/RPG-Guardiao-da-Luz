@@ -21,8 +21,8 @@ export default function Inventory({ selectedCharacter }: InventoryProps) {
                     <div className="font-medium capitalize">{slot}</div>
                     {item ? (
                       <div className="text-xs mt-1">
-                        {item.name}
-                        {item.bonus && ` (+${item.bonus.value} ${item.bonus.attr})`}
+                        <div>{item.name}</div>
+                        {item.bonus && <div>+{item.bonus.value} {item.bonus.attr.toUpperCase()}</div>}
                       </div>
                     ) : (
                       <div className="text-xs mt-1 text-gray-500">Vazio</div>
