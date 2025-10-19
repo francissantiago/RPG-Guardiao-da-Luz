@@ -9,7 +9,9 @@ import Inventory from './components/Inventory'
 
 function App() {
   const [characters, setCharacters] = useState<Character[]>([]);
-  const [currentView, setCurrentView] = useState<'create' | 'view'>('create');
+  const [currentView, setCurrentView] = useState<'create' | 'view'>(() => {
+    return (localStorage.getItem('currentView') as 'create' | 'view') || 'view';
+  });
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
   const [editedCharacter, setEditedCharacter] = useState<Character | null>(null);
   const [name, setName] = useState('');
@@ -26,6 +28,10 @@ function App() {
   useEffect(() => {
     fetchCharacters();
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem('currentView', currentView);
+  }, [currentView]);
 
   useEffect(() => {
     if (selectedRace) {
