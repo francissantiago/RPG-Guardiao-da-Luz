@@ -36,8 +36,15 @@ interface HexMapGeneratorProps {
 }
 
 export default function SquareMapGenerator({ size = 10, seed = Math.random() }: HexMapGeneratorProps) {
-    const [mapSize, setMapSize] = useState(size);
+  const [mapSize, setMapSize] = useState(size);
   const [currentSeed, setCurrentSeed] = useState(seed);
+  // Estado para célula selecionada
+  const [selectedCell, setSelectedCell] = useState<{ x: number; y: number } | null>(null);
+  // Zoom e Pan
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState<{ x: number; y: number } | null>(null);
 
   // Função para gerar coordenadas quadradas em formato retangular preenchendo completamente a área
   const generateHexCoordinates = (size: number): SquareCoordinate[] => {
@@ -168,6 +175,28 @@ export default function SquareMapGenerator({ size = 10, seed = Math.random() }: 
         >
           🎲 Gerar Novo Mapa
         </button>
+
+        {/* Zoom Controls */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setZoom(z => Math.min(z + 0.2, 5))}
+            className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded-md font-bold text-lg"
+            title="Zoom In"
+          >+
+          </button>
+          <span className="text-sm text-gray-700 dark:text-gray-300">Zoom: {zoom.toFixed(1)}x</span>
+          <button
+            onClick={() => setZoom(z => Math.max(z - 0.2, 0.2))}
+            className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded-md font-bold text-lg"
+            title="Zoom Out"
+          >−
+          </button>
+          <button
+            onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}
+            className="bg-gray-500 hover:bg-gray-700 text-white px-2 py-1 rounded-md font-bold text-sm"
+            title="Resetar Zoom e Posição"
+          >Resetar</button>
+        </div>
       </div>
 
       {/* Legenda */}
@@ -189,63 +218,120 @@ export default function SquareMapGenerator({ size = 10, seed = Math.random() }: 
       </div>
 
       {/* Mapa SVG */}
-      <div className="flex justify-center w-full">
-        {/**
-          Usamos viewBox em unidades de célula: largura = cols, altura = rows.
-          Definimos a proporção do SVG via CSS `aspectRatio` (cols/rows) para que
-          cada célula 1x1 no viewBox seja exibida como quadrado perfeito e o mapa
-          preencha toda a largura disponível sem criar espaços laterais.
-        */}
+      <div className="flex justify-center w-full select-none">
         <svg
           width="100%"
           viewBox={`0 0 ${mapCenter.actualWidth} ${mapCenter.actualHeight}`}
           preserveAspectRatio="xMidYMid meet"
           className="border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 max-w-full"
-          style={{ aspectRatio: `${mapCenter.cols} / ${mapCenter.rows}`, maxHeight: '70vh' }}
+          style={{ aspectRatio: `${mapCenter.cols} / ${mapCenter.rows}`, maxHeight: '70vh', cursor: isPanning ? 'grabbing' : 'grab' }}
+          onMouseDown={e => {
+            setIsPanning(true);
+            setPanStart({ x: e.clientX, y: e.clientY });
+          }}
+          onMouseUp={() => setIsPanning(false)}
+          onMouseLeave={() => setIsPanning(false)}
+          onMouseMove={e => {
+            if (isPanning && panStart) {
+              const dx = (e.clientX - panStart.x) / 30 / zoom; // Sensibilidade
+              const dy = (e.clientY - panStart.y) / 30 / zoom;
+              setPan(p => ({ x: p.x - dx, y: p.y - dy }));
+              setPanStart({ x: e.clientX, y: e.clientY });
+            }
+          }}
         >
-          {hexMap.map((hex) => {
-            // Renderizamos cada célula em unidades do viewBox: cada célula = 1x1
-            const gx = hex.coord.x; // coluna
-            const gy = hex.coord.y; // linha
+          <g transform={`scale(${zoom}) translate(${pan.x},${pan.y})`}>
+            {hexMap.map((hex) => {
+              const gx = hex.coord.x;
+              const gy = hex.coord.y;
+              const isSelected = selectedCell && selectedCell.x === gx && selectedCell.y === gy;
+              return (
+                <g key={`${hex.coord.x}-${hex.coord.y}`}>
+                  {/* Quadrado principal */}
+                  <rect
+                    x={gx}
+                    y={gy}
+                    width={1}
+                    height={1}
+                    fill={hex.terrain.color}
+                    stroke="#000"
+                    strokeWidth={0.03}
+                    vectorEffect="non-scaling-stroke"
+                    className="cursor-pointer"
+                    onClick={() => setSelectedCell(prev => (prev && prev.x === gx && prev.y === gy) ? null : { x: gx, y: gy })}
+                  />
+                  {/* Borda azul da célula selecionada */}
+                  {isSelected && (
+                    <>
+                      {/* overlay semi-transparente para melhor contraste (com animação de opacidade) */}
+                      <rect
+                        x={gx}
+                        y={gy}
+                        width={1}
+                        height={1}
+                        fill="#ff00ff66" /* overlay magenta para contraste */
+                        stroke="none"
+                        pointerEvents="none"
+                      >
+                        <animate
+                          attributeName="opacity"
+                          values="0.9;0.5;0.9"
+                          dur="1.0s"
+                          repeatCount="indefinite"
+                        />
+                      </rect>
+                      {/* borda pulsante */}
+                      <rect
+                        x={gx + 0.01}
+                        y={gy + 0.01}
+                        width={0.98}
+                        height={0.98}
+                        fill="none"
+                        stroke="#ff00ff" /* magenta vivo */
+                        strokeWidth={0.6} /* mais espessa por padrão */
+                        strokeLinejoin="round"
+                        vectorEffect="non-scaling-stroke"
+                        pointerEvents="none"
+                      >
+                        <animate
+                          attributeName="stroke-width"
+                          values="0.6;1.6;0.6" /* maior amplitude de pulso */
+                          dur="1s"
+                          repeatCount="indefinite"
+                        />
+                        <animate
+                          attributeName="opacity"
+                          values="1;0.5;1"
+                          dur="1s"
+                          repeatCount="indefinite"
+                        />
+                      </rect>
+                    </>
+                  )}
+                  {/* Coordenadas (opcional, para debug) */}
+                  {mapSize <= 7 && (
+                    <text
+                      x={gx + 0.5}
+                      y={gy + 0.5}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      className="text-xs fill-gray-700 pointer-events-none"
+                      style={{ fontSize: 0.35 }}
+                    >
+                      {hex.coord.x},{hex.coord.y}
+                    </text>
+                  )}
 
-            return (
-              <g key={`${hex.coord.x}-${hex.coord.y}`}>
-                {/* Quadrado (cada célula ocupa [x, x+1] x [y, y+1] no viewBox) */}
-                <rect
-                  x={gx}
-                  y={gy}
-                  width={1}
-                  height={1}
-                  fill={hex.terrain.color}
-                  stroke="#000"
-                  strokeWidth={0.03}
-                  vectorEffect="non-scaling-stroke"
-                  className="hover:stroke-blue-500 transition-colors cursor-pointer"
-                />
-
-                {/* Coordenadas (opcional, para debug) */}
-                {mapSize <= 7 && (
-                  <text
-                    x={gx + 0.5}
-                    y={gy + 0.5}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    className="text-xs fill-gray-700 pointer-events-none"
-                    style={{ fontSize: 0.35 }}
-                  >
-                    {hex.coord.x},{hex.coord.y}
-                  </text>
-                )}
-
-                {/* Tooltip */}
-                <title>
-                  {hex.terrain.name} ({hex.coord.x}, {hex.coord.y})
-                  {hex.terrain.walkable ? ' - Transitável' : ' - Intransitável'}
-                  {hex.terrain.defenseBonus !== 0 && ` - Bônus de defesa: ${hex.terrain.defenseBonus}`}
-                </title>
-              </g>
-            );
-          })}
+                  {/* Tooltip */}
+                  <title>
+                    {hex.terrain.name} ({hex.coord.x}, {hex.coord.y})
+                    {hex.terrain.walkable ? ' - Transitável' : ' - Intransitável'}
+                    {hex.terrain.defenseBonus !== 0 && ` - Bônus de defesa: ${hex.terrain.defenseBonus}`}
+                  </title>
+                </g>
+              );
+            })}
+          </g>
         </svg>
       </div>
 
@@ -253,8 +339,26 @@ export default function SquareMapGenerator({ size = 10, seed = Math.random() }: 
       <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
         <p>Mapa quadrado com {hexMap.length} quadrados • Seed: {currentSeed.toFixed(4)}</p>
         <p className="mt-1">
-          Passe o mouse sobre os quadrados para ver informações detalhadas
+          Passe o mouse sobre os quadrados para ver informações detalhadas.<br/>
+          Clique em um quadrado para selecionar e ver detalhes abaixo.
         </p>
+        {selectedCell && (
+          <div className="mt-4 p-3 rounded bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 inline-block">
+            <strong>Detalhes da célula selecionada:</strong>
+            <br />
+            Coordenadas: <span className="font-mono">{selectedCell.x},{selectedCell.y}</span>
+            <br />
+            {(() => {
+              const found = hexMap.find(h => h.coord.x === selectedCell.x && h.coord.y === selectedCell.y);
+              if (!found) return <span className="text-red-500">Não encontrada</span>;
+              return <>
+                Terreno: <span className="font-semibold">{found.terrain.name}</span><br/>
+                Transitável: {found.terrain.walkable ? 'Sim' : 'Não'}<br/>
+                Bônus de defesa: {found.terrain.defenseBonus}
+              </>;
+            })()}
+          </div>
+        )}
       </div>
     </div>
   );
