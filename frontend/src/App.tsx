@@ -7,11 +7,12 @@ import CharacterList from './components/CharacterList'
 import CharacterDetails from './components/CharacterDetails'
 import Inventory from './components/Inventory'
 import EnemyList from './components/EnemyList'
+import DiceRoller from './components/DiceRoller'
 
 function App() {
   const [characters, setCharacters] = useState<Character[]>([]);
-  const [currentView, setCurrentView] = useState<'create' | 'view' | 'enemies'>(() => {
-    const savedView = localStorage.getItem('currentView') as 'create' | 'view' | 'enemies';
+      const [currentView, setCurrentView] = useState<'create' | 'view' | 'enemies' | 'dice'>(() => {
+    const savedView = localStorage.getItem('currentView') as 'create' | 'view' | 'enemies' | 'dice';
     return savedView || 'view';
   });
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
@@ -115,7 +116,7 @@ function App() {
     }
   };
 
-  const createEnemy = async (enemyData: Omit<Enemy, 'id' | 'current_pv' | 'current_pe'>) => {
+  const createEnemy = async (enemyData: Omit<Enemy, 'id' | 'current_pv' | 'current_pc' | 'current_pe'>) => {
     try {
       const response = await fetch('http://localhost:3001/enemies', {
         method: 'POST',
@@ -295,6 +296,8 @@ function App() {
           />
         ) : currentView === 'enemies' ? (
           <EnemyList enemies={enemies} characters={characters} onCreateEnemy={createEnemy} />
+        ) : currentView === 'dice' ? (
+          <DiceRoller characters={characters} enemies={enemies} onUpdateCharacter={handleUpdateCharacter} />
         ) : (
           <div className="h-full grid grid-cols-[0.5fr_1fr_1fr] gap-4">
             <CharacterList

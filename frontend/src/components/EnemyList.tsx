@@ -4,7 +4,7 @@ import type { Enemy, Character } from '../types';
 interface EnemyListProps {
     enemies: Enemy[];
     characters: Character[];
-    onCreateEnemy: (enemyData: Omit<Enemy, 'id' | 'current_pv' | 'current_pe'>) => void;
+    onCreateEnemy: (enemyData: Omit<Enemy, 'id' | 'current_pv' | 'current_pc' | 'current_pe'>) => void;
 }
 
 export default function EnemyList({ enemies, characters, onCreateEnemy }: EnemyListProps) {
@@ -12,7 +12,7 @@ export default function EnemyList({ enemies, characters, onCreateEnemy }: EnemyL
     const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
     const [enemyName, setEnemyName] = useState('');
 
-    const generateEnemyFromCharacter = (character: Character, name: string): Omit<Enemy, 'id' | 'current_pv' | 'current_pe'> => {
+    const generateEnemyFromCharacter = (character: Character, name: string): Omit<Enemy, 'id' | 'current_pv' | 'current_pc' | 'current_pe'> => {
         // Gera atributos do inimigo baseado no personagem, mas com algumas variações
         const baseVariation = () => Math.floor(Math.random() * 4) - 2; // -2 a +2
 

@@ -16,6 +16,7 @@ export interface Character {
   weapon_attr: string;
   weapon_bonus: number;
   current_pv: number;
+  current_pc: number;
   current_pe: number;
   currency: number;
   inventory?: {
@@ -70,6 +71,7 @@ export interface Enemy {
   weapon_attr: string;
   weapon_bonus: number;
   current_pv: number;
+  current_pc: number;
   current_pe: number;
 }
 
