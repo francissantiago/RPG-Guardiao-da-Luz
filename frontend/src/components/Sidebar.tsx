@@ -1,8 +1,8 @@
 import type { Character } from '../types';
 
 interface SidebarProps {
-  currentView: 'create' | 'view';
-  setCurrentView: (view: 'create' | 'view') => void;
+  currentView: 'create' | 'view' | 'enemies';
+  setCurrentView: (view: 'create' | 'view' | 'enemies') => void;
   characters: Character[];
   addXp: (id: number, amount: number) => void;
   levelUp: (id: number) => void;
@@ -15,6 +15,7 @@ export default function Sidebar({ currentView, setCurrentView, characters, addXp
       <ul className="space-y-2">
         <li><button className={`w-full text-left p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded ${currentView === 'create' ? 'bg-gray-300 dark:bg-gray-600' : ''} text-gray-900 dark:text-white`} onClick={() => setCurrentView('create')}>Criar Personagem</button></li>
         <li><button className={`w-full text-left p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded ${currentView === 'view' ? 'bg-gray-300 dark:bg-gray-600' : ''} text-gray-900 dark:text-white`} onClick={() => setCurrentView('view')}>Ver Personagens</button></li>
+        <li><button className={`w-full text-left p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded ${currentView === 'enemies' ? 'bg-gray-300 dark:bg-gray-600' : ''} text-gray-900 dark:text-white`} onClick={() => setCurrentView('enemies')}>Ver Inimigos</button></li>
         <li><button className="w-full text-left p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-white">Configurações</button></li>
       </ul>
       {currentView === 'create' && (

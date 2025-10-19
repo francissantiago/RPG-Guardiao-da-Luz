@@ -49,6 +49,23 @@ db.serialize(() => {
     FOREIGN KEY (user_id) REFERENCES users (id)
   )`);
 
+  db.run(`CREATE TABLE IF NOT EXISTS enemies (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    level INTEGER DEFAULT 1,
+    forca INTEGER DEFAULT 0,
+    destreza INTEGER DEFAULT 0,
+    constituicao INTEGER DEFAULT 0,
+    inteligencia INTEGER DEFAULT 0,
+    sabedoria INTEGER DEFAULT 0,
+    carisma INTEGER DEFAULT 0,
+    weapon_name TEXT,
+    weapon_attr TEXT,
+    weapon_bonus INTEGER DEFAULT 0,
+    current_pv INTEGER,
+    current_pe INTEGER
+  )`);
+
   db.run(`CREATE TABLE IF NOT EXISTS items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -91,6 +108,29 @@ db.serialize(() => {
     (3, 'Armadura de Couro', 'armor', 'constituicao', 4, 150),
     (4, 'Botas de Couro', 'boots', 'destreza', 2, 75),
     (5, 'Poção de Cura', 'consumable', null, 50, 25)`);
+
+  // Inserir inimigos padrão se não existirem
+  db.run(`INSERT OR IGNORE INTO enemies (id, name, level, forca, destreza, constituicao, inteligencia, sabedoria, carisma, weapon_name, weapon_attr, weapon_bonus, current_pv, current_pe) VALUES
+    (1, 'Goblin', 1, 2, 3, 2, 1, 1, 1, 'Clava', 'forca', 1, 500, 165),
+    (2, 'Orc', 2, 4, 2, 4, 1, 2, 1, 'Machado', 'forca', 2, 1000, 330),
+    (3, 'Troll', 3, 5, 1, 6, 1, 1, 1, 'Porrete', 'forca', 3, 1500, 495),
+    (4, 'Lobo', 1, 3, 4, 3, 1, 2, 1, 'Presas', 'destreza', 1, 750, 165),
+    (5, 'Dragão Jovem', 5, 7, 5, 8, 4, 4, 3, 'Sopro de Fogo', 'inteligencia', 4, 2000, 825),
+    (6, 'Esqueleto', 2, 3, 3, 2, 1, 1, 1, 'Espada Enferrujada', 'forca', 1, 500, 165),
+    (7, 'Vampiro', 4, 5, 6, 5, 3, 3, 7, 'Presas Vampíricas', 'carisma', 3, 1250, 660),
+    (8, 'Gigante', 6, 8, 3, 9, 2, 2, 2, 'Clava Gigante', 'forca', 5, 2250, 990),
+    (9, 'Mago Negro', 4, 2, 2, 3, 8, 7, 5, 'Cajado Mágico', 'inteligencia', 4, 750, 1320),
+    (10, 'Cavaleiro Sombrio', 5, 6, 5, 6, 3, 4, 4, 'Espada Negra', 'forca', 3, 1500, 825),
+    (11, 'Serpente', 1, 2, 5, 2, 1, 1, 1, 'Veneno', 'destreza', 2, 500, 99),
+    (12, 'Minotauro', 4, 6, 3, 7, 1, 2, 2, 'Machado Duplo', 'forca', 4, 1750, 330),
+    (13, 'Arcanjo Caído', 7, 7, 6, 8, 5, 6, 8, 'Espada Flamejante', 'carisma', 5, 2000, 1584),
+    (14, 'Golem de Pedra', 5, 8, 1, 10, 1, 1, 1, 'Punhos de Pedra', 'forca', 3, 2500, 99),
+    (15, 'Fada das Sombras', 3, 1, 4, 2, 6, 5, 7, 'Magia das Sombras', 'inteligencia', 3, 500, 924),
+    (16, 'Ciclope', 6, 9, 2, 8, 1, 1, 1, 'Clava de Osso', 'forca', 4, 2000, 99),
+    (17, 'Elemental do Fogo', 4, 5, 4, 6, 3, 3, 2, 'Chamas Eternas', 'constituicao', 4, 1500, 528),
+    (18, 'Necromante', 5, 2, 3, 3, 9, 8, 4, 'Livro dos Mortos', 'inteligencia', 5, 750, 1386),
+    (19, 'Leviatã', 8, 10, 4, 12, 3, 4, 3, 'Cauda Poderosa', 'forca', 6, 3000, 660),
+    (20, 'Anjo Guardião', 6, 6, 7, 7, 5, 8, 9, 'Lâmina Sagrada', 'sabedoria', 5, 1750, 1584)`);
 });
 
 // Rotas para usuários
@@ -298,6 +338,53 @@ app.put('/characters/:id/items/:itemId/equip', (req, res) => {
 app.put('/characters/:id/items/:itemId/unequip', (req, res) => {
   const { id, itemId } = req.params;
   db.run('UPDATE character_items SET equipped_slot = NULL WHERE character_id = ? AND id = ?', [id, itemId], function(err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ changes: this.changes });
+  });
+});
+
+// Rotas para inimigos
+app.get('/enemies', (req, res) => {
+  db.all('SELECT * FROM enemies', [], (err, rows) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ enemies: rows });
+  });
+});
+
+app.post('/enemies', (req, res) => {
+  const { name, level, forca, destreza, constituicao, inteligencia, sabedoria, carisma, weapon_name, weapon_attr, weapon_bonus } = req.body;
+  const max_pv = Math.min(5000, constituicao * 250);
+  const max_pe = Math.min(2000, (inteligencia + sabedoria + carisma) * 33);
+  db.run('INSERT INTO enemies (name, level, forca, destreza, constituicao, inteligencia, sabedoria, carisma, weapon_name, weapon_attr, weapon_bonus, current_pv, current_pe) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [name, level || 1, forca || 0, destreza || 0, constituicao || 0, inteligencia || 0, sabedoria || 0, carisma || 0, weapon_name || '', weapon_attr || '', weapon_bonus || 0, max_pv, max_pe], function(err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ id: this.lastID });
+  });
+});
+
+app.put('/enemies/:id', (req, res) => {
+  const { id } = req.params;
+  const { name, level, forca, destreza, constituicao, inteligencia, sabedoria, carisma, weapon_name, weapon_attr, weapon_bonus, current_pv, current_pe } = req.body;
+  db.run('UPDATE enemies SET name = ?, level = ?, forca = ?, destreza = ?, constituicao = ?, inteligencia = ?, sabedoria = ?, carisma = ?, weapon_name = ?, weapon_attr = ?, weapon_bonus = ?, current_pv = ?, current_pe = ? WHERE id = ?', [name, level, forca, destreza, constituicao, inteligencia, sabedoria, carisma, weapon_name, weapon_attr, weapon_bonus, current_pv, current_pe, id], function(err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ changes: this.changes });
+  });
+});
+
+app.delete('/enemies/:id', (req, res) => {
+  const { id } = req.params;
+  db.run('DELETE FROM enemies WHERE id = ?', [id], function(err) {
     if (err) {
       res.status(500).json({ error: err.message });
       return;

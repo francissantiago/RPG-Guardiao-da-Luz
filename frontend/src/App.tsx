@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react'
 import './App.css'
-import type { Character, Race, Item } from './types'
+import type { Character, Race, Item, Enemy } from './types'
 import Sidebar from './components/Sidebar'
 import CharacterForm from './components/CharacterForm'
 import CharacterList from './components/CharacterList'
 import CharacterDetails from './components/CharacterDetails'
 import Inventory from './components/Inventory'
+import EnemyList from './components/EnemyList'
 
 function App() {
   const [characters, setCharacters] = useState<Character[]>([]);
-  const [currentView, setCurrentView] = useState<'create' | 'view'>(() => {
-    return (localStorage.getItem('currentView') as 'create' | 'view') || 'view';
+  const [currentView, setCurrentView] = useState<'create' | 'view' | 'enemies'>(() => {
+    const savedView = localStorage.getItem('currentView') as 'create' | 'view' | 'enemies';
+    return savedView || 'view';
   });
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
   const [editedCharacter, setEditedCharacter] = useState<Character | null>(null);
@@ -24,9 +26,11 @@ function App() {
   const [sabedoria, setSabedoria] = useState(0);
   const [carisma, setCarisma] = useState(0);
   const [pontosDisponiveis, setPontosDisponiveis] = useState(70);
+  const [enemies, setEnemies] = useState<Enemy[]>([]);
 
   useEffect(() => {
     fetchCharacters();
+    fetchEnemies();
   }, []);
 
   useEffect(() => {
@@ -98,6 +102,35 @@ function App() {
       setCharacters(charactersWithInventory);
     } catch (error) {
       console.error('Erro ao buscar personagens:', error);
+    }
+  };
+
+  const fetchEnemies = async () => {
+    try {
+      const response = await fetch('http://localhost:3001/enemies');
+      const data = await response.json();
+      setEnemies(data.enemies);
+    } catch (error) {
+      console.error('Erro ao buscar inimigos:', error);
+    }
+  };
+
+  const createEnemy = async (enemyData: Omit<Enemy, 'id' | 'current_pv' | 'current_pe'>) => {
+    try {
+      const response = await fetch('http://localhost:3001/enemies', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(enemyData),
+      });
+      if (response.ok) {
+        fetchEnemies();
+      } else {
+        console.error('Erro ao criar inimigo');
+      }
+    } catch (error) {
+      console.error('Erro ao criar inimigo:', error);
     }
   };
 
@@ -260,6 +293,8 @@ function App() {
             setCarisma={setCarisma}
             handleSubmit={handleSubmit}
           />
+        ) : currentView === 'enemies' ? (
+          <EnemyList enemies={enemies} characters={characters} onCreateEnemy={createEnemy} />
         ) : (
           <div className="h-full grid grid-cols-[0.5fr_1fr_1fr] gap-4">
             <CharacterList

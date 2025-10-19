@@ -56,6 +56,23 @@ export interface Race {
   };
 }
 
+export interface Enemy {
+  id: number;
+  name: string;
+  level: number;
+  forca: number;
+  destreza: number;
+  constituicao: number;
+  inteligencia: number;
+  sabedoria: number;
+  carisma: number;
+  weapon_name: string;
+  weapon_attr: string;
+  weapon_bonus: number;
+  current_pv: number;
+  current_pe: number;
+}
+
 export const races: Race[] = [
   // Raças Masculinas
   {
