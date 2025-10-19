@@ -47,7 +47,7 @@ export default function CharacterForm({
   return (
     <>
       <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md mb-8 text-center">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">RPG de Mesa Universal</h1>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">RPG - Guardião da Luz</h1>
       </div>
       <div className="w-full bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-8">
         <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Cadastrar Personagem</h2>
