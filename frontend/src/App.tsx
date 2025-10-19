@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import './App.css'
-import type { Character, Race } from './types'
+import type { Character, Race, Item } from './types'
 import Sidebar from './components/Sidebar'
 import CharacterForm from './components/CharacterForm'
 import CharacterList from './components/CharacterList'
@@ -57,7 +57,40 @@ function App() {
     try {
       const response = await fetch('http://localhost:3001/characters');
       const data = await response.json();
-      setCharacters(data.characters);
+      const charactersWithInventory = await Promise.all(data.characters.map(async (char: Character) => {
+        const itemsResponse = await fetch(`http://localhost:3001/characters/${char.id}/items`);
+        const itemsData = await itemsResponse.json();
+        const equipped: { [key: string]: Item | null } = {
+          head: null,
+          body: null,
+          hands: null,
+          legs: null,
+          feet: null,
+        };
+        itemsData.items.forEach((ci: any) => {
+          const slot = ci.equipped_slot as keyof typeof equipped;
+          if (slot && slot in equipped) {
+            equipped[slot] = {
+              id: ci.item_id,
+              name: ci.name,
+              type: ci.type,
+              bonus: ci.bonus_attr ? { attr: ci.bonus_attr, value: ci.bonus_value } : undefined,
+            };
+          }
+        });
+        const inventory = {
+          equipped,
+          items: itemsData.items.filter((ci: any) => !ci.equipped_slot).map((ci: any) => ({
+            id: ci.item_id,
+            name: ci.name,
+            type: ci.type,
+            bonus: ci.bonus_attr ? { attr: ci.bonus_attr, value: ci.bonus_value } : undefined,
+          })),
+          currency: char.currency,
+        };
+        return { ...char, inventory };
+      }));
+      setCharacters(charactersWithInventory);
     } catch (error) {
       console.error('Erro ao buscar personagens:', error);
     }
@@ -227,7 +260,7 @@ function App() {
             <CharacterList
               characters={characters}
               selectedCharacter={selectedCharacter}
-              onSelectCharacter={(char) => { setSelectedCharacter(char); setEditedCharacter({ ...char }); }}
+              onSelectCharacter={(char: Character) => { setSelectedCharacter(char); setEditedCharacter({ ...char }); }}
             />
             <CharacterDetails
               editedCharacter={editedCharacter}

@@ -43,7 +43,29 @@ db.serialize(() => {
     weapon_name TEXT,
     weapon_attr TEXT,
     weapon_bonus INTEGER DEFAULT 0,
+    current_pv INTEGER,
+    current_pe INTEGER,
+    currency INTEGER DEFAULT 300,
     FOREIGN KEY (user_id) REFERENCES users (id)
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL,
+    bonus_attr TEXT,
+    bonus_value INTEGER,
+    price INTEGER DEFAULT 0
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS character_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    character_id INTEGER,
+    item_id INTEGER,
+    equipped_slot TEXT,
+    quantity INTEGER DEFAULT 1,
+    FOREIGN KEY (character_id) REFERENCES characters (id),
+    FOREIGN KEY (item_id) REFERENCES items (id)
   )`);
 
   // Adicionar colunas se não existirem (para migração)
@@ -60,6 +82,15 @@ db.serialize(() => {
   db.run(`ALTER TABLE characters ADD COLUMN weapon_bonus INTEGER DEFAULT 0`, (err) => { if (err && !err.message.includes('duplicate column')) console.error(err); });
   db.run(`ALTER TABLE characters ADD COLUMN current_pv INTEGER`, (err) => { if (err && !err.message.includes('duplicate column')) console.error(err); });
   db.run(`ALTER TABLE characters ADD COLUMN current_pe INTEGER`, (err) => { if (err && !err.message.includes('duplicate column')) console.error(err); });
+  db.run(`ALTER TABLE characters ADD COLUMN currency INTEGER DEFAULT 300`, (err) => { if (err && !err.message.includes('duplicate column')) console.error(err); });
+
+  // Inserir items padrão se não existirem
+  db.run(`INSERT OR IGNORE INTO items (id, name, type, bonus_attr, bonus_value, price) VALUES
+    (1, 'Espada de Ferro', 'weapon', 'forca', 5, 100),
+    (2, 'Escudo de Madeira', 'shield', 'constituicao', 3, 50),
+    (3, 'Armadura de Couro', 'armor', 'constituicao', 4, 150),
+    (4, 'Botas de Couro', 'boots', 'destreza', 2, 75),
+    (5, 'Poção de Cura', 'consumable', null, 50, 25)`);
 });
 
 // Rotas para usuários
@@ -99,7 +130,7 @@ app.post('/characters', (req, res) => {
   const { name, race, level, user_id, forca, destreza, constituicao, inteligencia, sabedoria, carisma, pontos_disponiveis, xp, weapon_name, weapon_attr, weapon_bonus } = req.body;
   const max_pv = Math.min(5000, (constituicao + (weapon_attr === 'constituicao' ? weapon_bonus : 0)) * 250);
   const max_pe = Math.min(2000, ((inteligencia + sabedoria + carisma + (['inteligencia', 'sabedoria', 'carisma'].includes(weapon_attr) ? weapon_bonus : 0)) * 33));
-  db.run('INSERT INTO characters (name, race, level, user_id, forca, destreza, constituicao, inteligencia, sabedoria, carisma, pontos_disponiveis, xp, weapon_name, weapon_attr, weapon_bonus, current_pv, current_pe) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [name, race, level || 1, user_id, forca || 0, destreza || 0, constituicao || 0, inteligencia || 0, sabedoria || 0, carisma || 0, pontos_disponiveis || 70, xp || 0, weapon_name || '', weapon_attr || '', weapon_bonus || 0, max_pv, max_pe], function(err) {
+  db.run('INSERT INTO characters (name, race, level, user_id, forca, destreza, constituicao, inteligencia, sabedoria, carisma, pontos_disponiveis, xp, weapon_name, weapon_attr, weapon_bonus, current_pv, current_pe, currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [name, race, level || 1, user_id, forca || 0, destreza || 0, constituicao || 0, inteligencia || 0, sabedoria || 0, carisma || 0, pontos_disponiveis || 70, xp || 0, weapon_name || '', weapon_attr || '', weapon_bonus || 0, max_pv, max_pe, 300], function(err) {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
@@ -111,7 +142,7 @@ app.post('/characters', (req, res) => {
 app.put('/characters/:id', (req, res) => {
   const { id } = req.params;
   const { name, race, level, forca, destreza, constituicao, inteligencia, sabedoria, carisma, pontos_disponiveis, xp, weapon_name, weapon_attr, weapon_bonus, current_pv, current_pe } = req.body;
-  db.run('UPDATE characters SET name = ?, race = ?, level = ?, forca = ?, destreza = ?, constituicao = ?, inteligencia = ?, sabedoria = ?, carisma = ?, pontos_disponiveis = ?, xp = ?, weapon_name = ?, weapon_attr = ?, weapon_bonus = ?, current_pv = ?, current_pe = ? WHERE id = ?', [name, race, level, forca, destreza, constituicao, inteligencia, sabedoria, carisma, pontos_disponiveis, xp, weapon_name, weapon_attr, weapon_bonus, current_pv, current_pe, id], function(err) {
+  db.run('UPDATE characters SET name = ?, race = ?, level = ?, forca = ?, destreza = ?, constituicao = ?, inteligencia = ?, sabedoria = ?, carisma = ?, pontos_disponiveis = ?, xp = ?, weapon_name = ?, weapon_attr = ?, weapon_bonus = ?, current_pv = ?, current_pe = ?, currency = ? WHERE id = ?', [name, race, level, forca, destreza, constituicao, inteligencia, sabedoria, carisma, pontos_disponiveis, xp, weapon_name, weapon_attr, weapon_bonus, current_pv, current_pe, req.body.currency || 300, id], function(err) {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
@@ -190,6 +221,83 @@ app.put('/characters/:id/addxp', (req, res) => {
 app.delete('/characters/:id', (req, res) => {
   const { id } = req.params;
   db.run('DELETE FROM characters WHERE id = ?', [id], function(err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ changes: this.changes });
+  });
+});
+
+// Rotas para items
+app.get('/items', (req, res) => {
+  db.all('SELECT * FROM items', [], (err, rows) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ items: rows });
+  });
+});
+
+app.post('/items', (req, res) => {
+  const { name, type, bonus_attr, bonus_value, price } = req.body;
+  db.run('INSERT INTO items (name, type, bonus_attr, bonus_value, price) VALUES (?, ?, ?, ?, ?)', [name, type, bonus_attr, bonus_value, price], function(err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ id: this.lastID });
+  });
+});
+
+// Rotas para inventário
+app.get('/characters/:id/items', (req, res) => {
+  const { id } = req.params;
+  db.all('SELECT ci.*, i.name, i.type, i.bonus_attr, i.bonus_value FROM character_items ci JOIN items i ON ci.item_id = i.id WHERE ci.character_id = ?', [id], (err, rows) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ items: rows });
+  });
+});
+
+app.post('/characters/:id/items', (req, res) => {
+  const { id } = req.params;
+  const { item_id, quantity } = req.body;
+  db.run('INSERT INTO character_items (character_id, item_id, quantity) VALUES (?, ?, ?)', [id, item_id, quantity || 1], function(err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ id: this.lastID });
+  });
+});
+
+app.put('/characters/:id/items/:itemId/equip', (req, res) => {
+  const { id, itemId } = req.params;
+  const { slot } = req.body;
+  // Primeiro, desequipar qualquer item no slot
+  db.run('UPDATE character_items SET equipped_slot = NULL WHERE character_id = ? AND equipped_slot = ?', [id, slot], function(err) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    // Agora equipar o item
+    db.run('UPDATE character_items SET equipped_slot = ? WHERE character_id = ? AND id = ?', [slot, id, itemId], function(err) {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      res.json({ changes: this.changes });
+    });
+  });
+});
+
+app.put('/characters/:id/items/:itemId/unequip', (req, res) => {
+  const { id, itemId } = req.params;
+  db.run('UPDATE character_items SET equipped_slot = NULL WHERE character_id = ? AND id = ?', [id, itemId], function(err) {
     if (err) {
       res.status(500).json({ error: err.message });
       return;

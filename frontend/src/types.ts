@@ -17,13 +17,10 @@ export interface Character {
   weapon_bonus: number;
   current_pv: number;
   current_pe: number;
+  currency: number;
   inventory?: {
     equipped: {
-      head: Item | null;
-      body: Item | null;
-      hands: Item | null;
-      legs: Item | null;
-      feet: Item | null;
+      [key: string]: Item | null;
     };
     items: Item[];
     currency: number;
