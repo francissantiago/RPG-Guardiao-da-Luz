@@ -29,6 +29,43 @@ const TERRAIN_CONFIGS: Record<TerrainType, TerrainConfig> = {
   swamp: { type: 'swamp', color: '#556B2F', name: 'Pântano', walkable: true, defenseBonus: -1 },
 };
 
+// Ícones SVG para cada tipo de terreno
+const TERRAIN_ICONS: Record<TerrainType, React.ReactNode> = {
+  grass: (
+    <rect x={0.25} y={0.25} width={0.5} height={0.5} fill="#3cb371" rx={0.15} />
+  ),
+  forest: (
+    <g>
+      <ellipse cx={0.5} cy={0.55} rx={0.22} ry={0.28} fill="#145a32" />
+      <rect x={0.45} y={0.7} width={0.1} height={0.18} fill="#6e4b1a" />
+    </g>
+  ),
+  mountain: (
+    <polygon points="0.2,0.9 0.5,0.2 0.8,0.9" fill="#a9a9a9" stroke="#555" strokeWidth={0.04} />
+  ),
+  water: (
+    <ellipse cx={0.5} cy={0.5} rx={0.32} ry={0.22} fill="#1e90ff" />
+  ),
+  desert: (
+    <g>
+      <ellipse cx={0.5} cy={0.6} rx={0.28} ry={0.18} fill="#e2c16b" />
+      <rect x={0.35} y={0.75} width={0.3} height={0.08} fill="#c2b280" rx={0.04} />
+    </g>
+  ),
+  snow: (
+    <g>
+      <ellipse cx={0.5} cy={0.5} rx={0.28} ry={0.22} fill="#e0f7fa" />
+      <rect x={0.42} y={0.7} width={0.16} height={0.08} fill="#b2ebf2" rx={0.04} />
+    </g>
+  ),
+  swamp: (
+    <g>
+      <ellipse cx={0.5} cy={0.6} rx={0.22} ry={0.16} fill="#556b2f" />
+      <rect x={0.45} y={0.75} width={0.1} height={0.08} fill="#2e4d1a" />
+    </g>
+  ),
+};
+
 // Props do componente
 interface HexMapGeneratorProps {
   size?: number;
@@ -199,18 +236,17 @@ export default function SquareMapGenerator({ size = 10, seed = Math.random() }: 
         </div>
       </div>
 
-      {/* Legenda */}
+      {/* Legenda com ícones SVG */}
       <div className="mb-6">
         <h3 className="text-lg font-medium mb-3 text-gray-900 dark:text-white">Legenda:</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
-          {Object.values(TERRAIN_CONFIGS).map(config => (
-            <div key={config.type} className="flex itens-center gap-2">
-              <div
-                className="w-4 h-4 rounded border border-gray-300"
-                style={{ backgroundColor: config.color }}
-              ></div>
+          {Object.keys(TERRAIN_CONFIGS).map(type => (
+            <div key={type} className="flex items-center gap-2">
+              <svg width={24} height={24} viewBox="0 0 1 1" style={{ background: TERRAIN_CONFIGS[type as TerrainType].color, borderRadius: 4, border: '1px solid #ccc' }}>
+                {TERRAIN_ICONS[type as TerrainType]}
+              </svg>
               <span className="text-sm text-gray-700 dark:text-gray-300">
-                {config.name}
+                {TERRAIN_CONFIGS[type as TerrainType].name}
               </span>
             </div>
           ))}
@@ -260,6 +296,10 @@ export default function SquareMapGenerator({ size = 10, seed = Math.random() }: 
                     className="cursor-pointer"
                     onClick={() => setSelectedCell(prev => (prev && prev.x === gx && prev.y === gy) ? null : { x: gx, y: gy })}
                   />
+                  {/* Ícone do terreno */}
+                  <g transform={`translate(${gx},${gy})`}>
+                    {TERRAIN_ICONS[hex.terrain.type]}
+                  </g>
                   {/* Borda azul da célula selecionada */}
                   {isSelected && (
                     <>
