@@ -13,11 +13,11 @@ export default function Inventory({ selectedCharacter }: InventoryProps) {
           {/* Equipamento */}
           <div>
             <h3 className="text-lg font-medium mb-2 text-gray-900 dark:text-white">Equipamento</h3>
-            <div className="grid grid-cols-5 gap-2">
+            <div className="grid grid-cols-5 gap-2 min-h-[100px]">
               {['head', 'body', 'hands', 'legs', 'feet'].map((slot) => {
                 const item = selectedCharacter.inventory?.equipped?.[slot];
                 return (
-                  <div key={slot} className="bg-gray-100 dark:bg-gray-700 p-2 rounded text-center text-sm">
+                  <div key={slot} className="bg-gray-100 dark:bg-gray-700 p-2 rounded text-center text-md">
                     <div className="font-medium capitalize">{slot}</div>
                     {item ? (
                       <div className="text-xs mt-1">
@@ -35,7 +35,7 @@ export default function Inventory({ selectedCharacter }: InventoryProps) {
           {/* Itens */}
           <div>
             <h3 className="text-lg font-medium mb-2 text-gray-900 dark:text-white">Itens</h3>
-            <div className="grid grid-cols-4 gap-2 mb-4">
+            <div className="grid grid-cols-4 gap-2 mb-4 min-h-[90px]">
               {selectedCharacter.inventory?.items.map((item, index) => (
                 <div key={index} className="bg-gray-100 dark:bg-gray-700 p-2 rounded text-center text-sm">
                   {item.name}
