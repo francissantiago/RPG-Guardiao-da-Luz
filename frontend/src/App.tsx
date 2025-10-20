@@ -9,12 +9,14 @@ import Inventory from './components/Inventory'
 import EnemyList from './components/EnemyList'
 import DiceRoller from './components/DiceRoller'
 import SquareMapGenerator from './components/SquareMapGenerator'
+import CampaignOverview from './components/CampaignOverview'
 
 function App() {
   const [characters, setCharacters] = useState<Character[]>([]);
-      const [currentView, setCurrentView] = useState<'create' | 'view' | 'enemies' | 'dice' | 'maps'>(() => {
-    const savedView = localStorage.getItem('currentView') as 'create' | 'view' | 'enemies' | 'dice' | 'maps';
-    return savedView || 'view';
+  const [enemies, setEnemies] = useState<Enemy[]>([]);
+      const [currentView, setCurrentView] = useState<'create' | 'view' | 'enemies' | 'dice' | 'maps' | 'campaign'>(() => {
+    const savedView = localStorage.getItem('currentView') as 'create' | 'view' | 'enemies' | 'dice' | 'maps' | 'campaign';
+    return savedView || 'campaign';
   });
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
   const [editedCharacter, setEditedCharacter] = useState<Character | null>(null);
@@ -28,7 +30,10 @@ function App() {
   const [sabedoria, setSabedoria] = useState(0);
   const [carisma, setCarisma] = useState(0);
   const [pontosDisponiveis, setPontosDisponiveis] = useState(70);
-  const [enemies, setEnemies] = useState<Enemy[]>([]);
+  const [isExpanded, setIsExpanded] = useState(() => {
+    const saved = localStorage.getItem('sidebarExpanded');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
 
   useEffect(() => {
     fetchCharacters();
@@ -38,6 +43,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem('currentView', currentView);
   }, [currentView]);
+
+  useEffect(() => {
+    localStorage.setItem('sidebarExpanded', JSON.stringify(isExpanded));
+  }, [isExpanded]);
 
   useEffect(() => {
     if (selectedRace) {
@@ -271,6 +280,8 @@ function App() {
         characters={characters}
         addXp={addXp}
         levelUp={levelUp}
+        isExpanded={isExpanded}
+        setIsExpanded={setIsExpanded}
       />
       <main className="flex-1 px-4 py-4">
         {currentView === 'create' ? (
@@ -301,6 +312,8 @@ function App() {
           <DiceRoller characters={characters} enemies={enemies} onUpdateCharacter={handleUpdateCharacter} />
         ) : currentView === 'maps' ? (
           <SquareMapGenerator />
+        ) : currentView === 'campaign' ? (
+          <CampaignOverview characters={characters} enemies={enemies} />
         ) : (
           <div className="h-full grid grid-cols-[0.5fr_1fr_1fr] gap-4">
             <CharacterList
