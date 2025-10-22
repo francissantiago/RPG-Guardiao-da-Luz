@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import type { Character } from '../types';
 
 // Tipos para coordenadas quadradas
@@ -73,9 +73,11 @@ interface HexMapGeneratorProps {
   seed?: number;
   characters?: Character[];
   compact?: boolean; // quando true, renderiza somente o mapa (modo campanha)
+  selectedCharacter?: Character | null;
+  onCharacterMoved?: (updated: Character) => void;
 }
 
-export default function SquareMapGenerator({ size = 10, seed = Math.random(), characters = [], compact = false }: HexMapGeneratorProps) {
+export default function SquareMapGenerator({ size = 10, seed = Math.random(), characters = [], compact = false, selectedCharacter = null, onCharacterMoved }: HexMapGeneratorProps) {
   const [mapSize, setMapSize] = useState<number>(size);
   const [currentSeed, setCurrentSeed] = useState<number>(seed);
   // Estado para célula selecionada
@@ -85,6 +87,14 @@ export default function SquareMapGenerator({ size = 10, seed = Math.random(), ch
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState<{ x: number; y: number } | null>(null);
+  // Estado para posições animadas dos personagens: { [charId]: { x, y } }
+  const [animatedPositions, setAnimatedPositions] = useState<Record<number, { x: number; y: number }>>(() => {
+    const init: Record<number, { x: number; y: number }> = {};
+    characters.forEach(c => { if (c.location) init[c.id] = { x: c.location.x, y: c.location.y }; });
+    return init;
+  });
+  const rafRef = useRef<number | null>(null);
+  const animRefs = useRef<Record<number, { startX: number; startY: number; toX: number; toY: number; startTime: number; duration: number }>>({});
 
   // Função para gerar coordenadas quadradas em formato retangular preenchendo completamente a área
   const generateHexCoordinates = (size: number): SquareCoordinate[] => {
@@ -186,6 +196,74 @@ export default function SquareMapGenerator({ size = 10, seed = Math.random(), ch
   useEffect(() => {
     setMapSize(size);
   }, [size]);
+
+  // Quando a lista de characters mudar (posições atualizadas pelo servidor via onCharacterMoved), animar cada marcador que teve mudança de célula.
+  useEffect(() => {
+    const now = performance.now();
+    const nextAnimated: Record<number, { x: number; y: number }> = { ...animatedPositions };
+    let needsFrame = false;
+
+    characters.forEach(c => {
+      if (!c.location) return;
+      const prev = animatedPositions[c.id];
+      const to = { x: c.location.x, y: c.location.y };
+      if (!prev) {
+        // inicializar se ainda não existente
+        nextAnimated[c.id] = { x: to.x, y: to.y };
+        return;
+      }
+      if (prev.x !== to.x || prev.y !== to.y) {
+        // preparar animação
+        const dx = Math.abs(to.x - prev.x);
+        const dy = Math.abs(to.y - prev.y);
+        const dist = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+        const durationPerTile = 180; // ms por tile
+        const duration = Math.round(durationPerTile * dist);
+        animRefs.current[c.id] = { startX: prev.x, startY: prev.y, toX: to.x, toY: to.y, startTime: now, duration };
+        needsFrame = true;
+      }
+    });
+
+    if (needsFrame) {
+      // start RAF loop
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      const step = (t: number) => {
+        let anyRunning = false;
+        const updated: Record<number, { x: number; y: number }> = { ...nextAnimated };
+        Object.keys(animRefs.current).forEach(key => {
+          const id = parseInt(key);
+          const r = animRefs.current[id];
+          if (!r) return;
+          const elapsed = t - r.startTime;
+          const progress = Math.min(1, Math.max(0, elapsed / r.duration));
+          const ix = r.startX + (r.toX - r.startX) * progress;
+          const iy = r.startY + (r.toY - r.startY) * progress;
+          updated[id] = { x: ix, y: iy };
+          if (progress < 1) anyRunning = true;
+          else {
+            // finalize: set position exactly and remove animRef
+            updated[id] = { x: r.toX, y: r.toY };
+            delete animRefs.current[id];
+          }
+        });
+        setAnimatedPositions(updated);
+        if (anyRunning) rafRef.current = requestAnimationFrame(step);
+        else rafRef.current = null;
+      };
+      rafRef.current = requestAnimationFrame(step);
+    } else {
+      // apenas sincronizar posições (caso sem animações pendentes)
+      const synced: Record<number, { x: number; y: number }> = {};
+      characters.forEach(c => { if (c.location) synced[c.id] = { x: c.location.x, y: c.location.y }; });
+      setAnimatedPositions(synced);
+    }
+
+    return () => {
+      // cancel any raf if component unmounts or chars change
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [characters]);
 
   // helpers de cor: calcula se a cor é escura para ajustar cor do texto
   const hexToRgb = (hex: string) => {
@@ -332,7 +410,39 @@ export default function SquareMapGenerator({ size = 10, seed = Math.random(), ch
                     strokeWidth={0.03}
                     vectorEffect="non-scaling-stroke"
                     className="cursor-pointer"
-                    onClick={() => setSelectedCell(prev => (prev && prev.x === gx && prev.y === gy) ? null : { x: gx, y: gy })}
+                    onClick={async () => {
+                      // se houver personagem selecionado, e o tile for adjacente, tente step
+                      if (selectedCharacter && selectedCharacter.location) {
+                        const from = selectedCharacter.location;
+                        const dx = gx - from.x;
+                        const dy = gy - from.y;
+                        if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1 && !(dx === 0 && dy === 0)) {
+                          try {
+                            const resp = await fetch(`http://localhost:3001/characters/${selectedCharacter.id}/step`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ dx, dy }),
+                            });
+                            const data = await resp.json();
+                            if (resp.ok) {
+                              // notificar app para atualizar estado
+                              if (onCharacterMoved) onCharacterMoved({ ...selectedCharacter, location: { x: data.to.x, y: data.to.y } } as Character);
+                              // atualizar seleção de célula
+                              setSelectedCell({ x: data.to.x, y: data.to.y });
+                            } else {
+                              alert(data.error || 'Erro ao mover personagem');
+                            }
+                          } catch (e) {
+                            console.error('Erro ao chamar step:', e);
+                            alert('Erro de conexão ao mover personagem');
+                          }
+                          return;
+                        }
+                      }
+
+                      // comportamento padrão de seleção de célula
+                      setSelectedCell(prev => (prev && prev.x === gx && prev.y === gy) ? null : { x: gx, y: gy });
+                    }}
                   />
                   {/* Ícone do terreno */}
                   <g transform={`translate(${gx},${gy})`}>
@@ -411,18 +521,21 @@ export default function SquareMapGenerator({ size = 10, seed = Math.random(), ch
             })}
               {/* Marcadores de personagens: renderizados depois para ficarem sobre os tiles */}
               {characters.filter(c => c.location).map(c => {
-                const lx = c.location!.x;
-                const ly = c.location!.y;
+                const animated = animatedPositions[c.id] ?? (c.location ? { x: c.location.x, y: c.location.y } : { x: 0, y: 0 });
+                const lx = animated.x;
+                const ly = animated.y;
                 const color = c.color ?? '#2563eb'; // fallback azul
                 // ajustar o tamanho do marcador com base no tamanho do mapa (mapSize)
                 const baseRadius = 0.28;
                 const radius = Math.max(0.12, Math.min(0.6, baseRadius * (10 / Math.max(3, mapSize))));
                 const fontSize = radius * 1.6;
                 const haloStroke = 'rgba(0,0,0,0.65)';
-                const isMarkerSelected = selectedCell && selectedCell.x === lx && selectedCell.y === ly;
+                // determinar seleção comparando com posição inteira do personagem (não interpolada)
+                const realPos = c.location ?? { x: Math.round(lx), y: Math.round(ly) };
+                const isMarkerSelected = selectedCell && selectedCell.x === realPos.x && selectedCell.y === realPos.y;
 
                 return (
-                  <g key={`marker-${c.id}`} transform={`translate(${lx + 0.5},${ly + 0.5})`} className="pointer-events-auto">
+                  <g key={`marker-${c.id}`} transform={`translate(${lx + 0.5},${ly + 0.5})`} className="pointer-events-auto" style={{ transition: 'transform 0.12s linear' }}>
                     {/* halo externo (maior se selecionado) */}
                     <circle cx={0} cy={0} r={radius + (isMarkerSelected ? 0.12 : 0.06)} fill="none" stroke={haloStroke} strokeWidth={isMarkerSelected ? 0.05 : 0.03} opacity={0.95} vectorEffect="non-scaling-stroke" pointerEvents="none">
                       {isMarkerSelected && (

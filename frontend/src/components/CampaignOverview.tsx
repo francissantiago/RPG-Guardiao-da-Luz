@@ -11,9 +11,11 @@ interface CampaignOverviewProps {
   activeCampaign: Campaign | null;
   onCreateCampaign: (name: string, mapSize: number) => Promise<void>;
   onEndCampaign: () => Promise<void>;
+  selectedCharacter?: Character | null;
+  onCharacterMoved?: (updated: Character) => void;
 }
 
-export default function CampaignOverview({ characters, enemies, activeCampaign, onCreateCampaign, onEndCampaign }: CampaignOverviewProps) {
+export default function CampaignOverview({ characters, enemies, activeCampaign, onCreateCampaign, onEndCampaign, selectedCharacter, onCharacterMoved }: CampaignOverviewProps) {
   const dice = useDiceRoller(characters);
   const [isCreatingCampaign, setIsCreatingCampaign] = useState(false);
   const [campaignName, setCampaignName] = useState('');
@@ -163,7 +165,7 @@ export default function CampaignOverview({ characters, enemies, activeCampaign, 
                 �️ Mapa da Campanha
               </h2>
               <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                <SquareMapGenerator size={activeCampaign.map_size} seed={activeCampaign.map_seed} characters={characters} compact={true} />
+                <SquareMapGenerator size={activeCampaign.map_size} seed={activeCampaign.map_seed} characters={characters} compact={true} selectedCharacter={selectedCharacter} onCharacterMoved={onCharacterMoved} />
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
                   Mapa procedural • Clique para interagir • Personagens em azul
                 </p>

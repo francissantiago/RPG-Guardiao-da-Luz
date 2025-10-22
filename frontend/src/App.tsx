@@ -614,7 +614,12 @@ function App() {
         ) : currentView === 'dice' ? (
           <DiceRoller characters={characters} />
         ) : currentView === 'maps' ? (
-          <SquareMapGenerator />
+          <SquareMapGenerator selectedCharacter={selectedCharacter} onCharacterMoved={(updated) => {
+            // atualizar lista local de characters
+            setCharacters(prev => prev.map(c => c.id === updated.id ? { ...c, location: updated.location } : c));
+            // atualizar seleção
+            setSelectedCharacter(prev => prev && prev.id === updated.id ? { ...prev, location: updated.location } : prev);
+          }} />
         ) : currentView === 'campaign' ? (
           <CampaignOverview 
             characters={characters} 
@@ -623,6 +628,11 @@ function App() {
             activeCampaign={activeCampaign}
             onCreateCampaign={createCampaign}
             onEndCampaign={endCampaign}
+            selectedCharacter={selectedCharacter}
+            onCharacterMoved={(updated: Character) => {
+              setCharacters(prev => prev.map(c => c.id === updated.id ? { ...c, location: updated.location } : c));
+              setSelectedCharacter(prev => prev && prev.id === updated.id ? { ...prev, location: updated.location } : prev);
+            }}
           />
         ) : (
           <div className="h-full grid grid-cols-[0.5fr_1fr_1fr] gap-4">

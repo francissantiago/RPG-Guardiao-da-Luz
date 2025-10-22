@@ -18,6 +18,42 @@ const db = new sqlite3.Database('./rpg.db', (err: Error | null) => {
   }
 });
 
+// Terreno / ruído (paridade com frontend)
+const TERRAIN_CONFIGS: Record<string, { walkable: boolean }> = {
+  grass: { walkable: true },
+  forest: { walkable: true },
+  mountain: { walkable: false },
+  water: { walkable: false },
+  desert: { walkable: true },
+  snow: { walkable: true },
+  swamp: { walkable: true },
+};
+
+const noise = (x: number, y: number, seed: number): number => {
+  const n = Math.sin(x * 12.9898 + y * 78.233 + seed * 43758.5453) * 43758.5453;
+  return n - Math.floor(n);
+};
+
+const getTerrainType = (x: number, y: number, seed: number, mapSize: number) => {
+  const elevation = noise(x * 0.1, y * 0.1, seed);
+  const moisture = noise(x * 0.05 + 100, y * 0.05 + 100, seed);
+  const temperature = 1 - Math.abs(y) / mapSize;
+  const isBorder = Math.abs(x) > mapSize * 2.5 || Math.abs(y) > mapSize * 0.7;
+
+  if (isBorder && elevation > 0.5) return 'mountain';
+  if (elevation > 0.7) return temperature > 0.3 ? 'mountain' : 'snow';
+  if (moisture > 0.6) return elevation > 0.3 ? 'swamp' : 'water';
+  if (temperature < 0.2) return 'snow';
+  if (temperature > 0.8 && moisture < 0.3) return 'desert';
+  if (elevation > 0.4) return 'forest';
+  return 'grass';
+};
+
+const isWalkable = (x: number, y: number, seed: number, mapSize: number) => {
+  const t = getTerrainType(x, y, seed, mapSize);
+  return TERRAIN_CONFIGS[t]?.walkable ?? false;
+};
+
 // Criar tabelas
 db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS users (
@@ -176,6 +212,19 @@ app.get('/users', (req: Request, res: Response) => {
     }
     res.json({ users: rows });
   });
+
+  // Histórico de movimentação
+  db.run(`CREATE TABLE IF NOT EXISTS movement_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    character_id INTEGER,
+    from_x INTEGER,
+    from_y INTEGER,
+    to_x INTEGER,
+    to_y INTEGER,
+    events TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (character_id) REFERENCES characters(id)
+  )`);
 });
 
 app.post('/users', (req: Request, res: Response) => {
@@ -346,6 +395,105 @@ app.delete('/characters/:id', (req: Request, res: Response) => {
       return;
     }
     res.json({ changes: this.changes });
+  });
+});
+
+// Movimento por passo: body { dx, dy } onde dx/dy ∈ {-1,0,1}
+app.post('/characters/:id/step', (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { dx, dy } = req.body;
+  if (typeof dx !== 'number' || typeof dy !== 'number') {
+    res.status(400).json({ error: 'dx/dy inválidos' });
+    return;
+  }
+
+  db.get('SELECT * FROM characters WHERE id = ?', [id], (err: Error | null, char: any) => {
+    if (err) { res.status(500).json({ error: err.message }); return; }
+    if (!char) { res.status(404).json({ error: 'Personagem não encontrado' }); return; }
+
+    const campaignId = char.campaign_id;
+    if (!campaignId) { res.status(400).json({ error: 'Personagem não vinculado a uma campanha' }); return; }
+
+    db.get('SELECT * FROM campaigns WHERE id = ?', [campaignId], (err: Error | null, camp: any) => {
+      if (err) { res.status(500).json({ error: err.message }); return; }
+      if (!camp) { res.status(404).json({ error: 'Campanha não encontrada' }); return; }
+
+      const fromX = char.location_x ?? 0;
+      const fromY = char.location_y ?? 0;
+      const toX = fromX + dx;
+      const toY = fromY + dy;
+
+      // validar bounds e terreno
+      if (!isWalkable(toX, toY, camp.map_seed, camp.map_size)) {
+        res.status(422).json({ error: 'Terreno intransitável' });
+        return;
+      }
+
+      // verificar ocupação
+      db.get('SELECT id FROM characters WHERE location_x = ? AND location_y = ? AND campaign_id = ?', [toX, toY, campaignId], (err: Error | null, occ: any) => {
+        if (err) { res.status(500).json({ error: err.message }); return; }
+        if (occ) { res.status(409).json({ error: 'Célula ocupada' }); return; }
+
+        // atualizar posição
+        db.run('UPDATE characters SET location_x = ?, location_y = ? WHERE id = ?', [toX, toY, id], function(err: Error | null) {
+          if (err) { res.status(500).json({ error: err.message }); return; }
+
+          // persistir no histórico (events podem ser preenchidos pelo GM manualmente depois)
+          const events = JSON.stringify([]);
+          db.run('INSERT INTO movement_history (character_id, from_x, from_y, to_x, to_y, events) VALUES (?, ?, ?, ?, ?, ?)', [id, fromX, fromY, toX, toY, events], function(err: Error | null) {
+            if (err) console.error('Erro ao inserir movement_history:', err.message);
+            res.json({ success: true, from: { x: fromX, y: fromY }, to: { x: toX, y: toY }, events: [] });
+          });
+        });
+      });
+    });
+  });
+});
+
+// Teleport (body { to: { x, y } }) - não permite teleporte para célula ocupada
+app.post('/characters/:id/teleport', (req: Request, res: Response) => {
+  const { id } = req.params;
+  const to = req.body.to;
+  if (!to || typeof to.x !== 'number' || typeof to.y !== 'number') { res.status(400).json({ error: 'Destino inválido' }); return; }
+
+  db.get('SELECT * FROM characters WHERE id = ?', [id], (err: Error | null, char: any) => {
+    if (err) { res.status(500).json({ error: err.message }); return; }
+    if (!char) { res.status(404).json({ error: 'Personagem não encontrado' }); return; }
+
+    const campaignId = char.campaign_id;
+    if (!campaignId) { res.status(400).json({ error: 'Personagem não vinculado a uma campanha' }); return; }
+
+    db.get('SELECT * FROM campaigns WHERE id = ?', [campaignId], (err: Error | null, camp: any) => {
+      if (err) { res.status(500).json({ error: err.message }); return; }
+      if (!camp) { res.status(404).json({ error: 'Campanha não encontrada' }); return; }
+
+      const toX = to.x;
+      const toY = to.y;
+
+      // validar bounds e terreno
+      if (!isWalkable(toX, toY, camp.map_seed, camp.map_size)) {
+        res.status(422).json({ error: 'Terreno intransitável' });
+        return;
+      }
+
+      // verificar ocupação
+      db.get('SELECT id FROM characters WHERE location_x = ? AND location_y = ? AND campaign_id = ?', [toX, toY, campaignId], (err: Error | null, occ: any) => {
+        if (err) { res.status(500).json({ error: err.message }); return; }
+        if (occ) { res.status(409).json({ error: 'Célula ocupada' }); return; }
+
+        const fromX = char.location_x ?? 0;
+        const fromY = char.location_y ?? 0;
+
+        db.run('UPDATE characters SET location_x = ?, location_y = ? WHERE id = ?', [toX, toY, id], function(err: Error | null) {
+          if (err) { res.status(500).json({ error: err.message }); return; }
+          const events = JSON.stringify([]);
+          db.run('INSERT INTO movement_history (character_id, from_x, from_y, to_x, to_y, events) VALUES (?, ?, ?, ?, ?, ?)', [id, fromX, fromY, toX, toY, events], function(err: Error | null) {
+            if (err) console.error('Erro ao inserir movement_history:', err.message);
+            res.json({ success: true, from: { x: fromX, y: fromY }, to: { x: toX, y: toY }, events: [] });
+          });
+        });
+      });
+    });
   });
 });
 
