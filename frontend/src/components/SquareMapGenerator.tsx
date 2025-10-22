@@ -187,6 +187,31 @@ export default function SquareMapGenerator({ size = 10, seed = Math.random(), ch
     setMapSize(size);
   }, [size]);
 
+  // helpers de cor: calcula se a cor é escura para ajustar cor do texto
+  const hexToRgb = (hex: string) => {
+    if (!hex) return { r: 0, g: 0, b: 0 };
+    const clean = hex.replace('#', '');
+    if (clean.length === 3) {
+      return {
+        r: parseInt(clean[0] + clean[0], 16),
+        g: parseInt(clean[1] + clean[1], 16),
+        b: parseInt(clean[2] + clean[2], 16),
+      };
+    }
+    return {
+      r: parseInt(clean.substring(0, 2), 16),
+      g: parseInt(clean.substring(2, 4), 16),
+      b: parseInt(clean.substring(4, 6), 16),
+    };
+  };
+
+  const isDarkColor = (hex: string) => {
+    const { r, g, b } = hexToRgb(hex || '#000000');
+    // luminance formula
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance < 0.6; // threshold: adjust if necessary
+  };
+
   // Handler para gerar um novo mapa (novo seed)
   const generateNewMap = () => {
     setCurrentSeed(Math.random());
@@ -384,22 +409,66 @@ export default function SquareMapGenerator({ size = 10, seed = Math.random(), ch
                 </g>
               );
             })}
+              {/* Marcadores de personagens: renderizados depois para ficarem sobre os tiles */}
+              {characters.filter(c => c.location).map(c => {
+                const lx = c.location!.x;
+                const ly = c.location!.y;
+                const color = c.color ?? '#2563eb'; // fallback azul
+                // ajustar o tamanho do marcador com base no tamanho do mapa (mapSize)
+                const baseRadius = 0.28;
+                const radius = Math.max(0.12, Math.min(0.6, baseRadius * (10 / Math.max(3, mapSize))));
+                const fontSize = radius * 1.6;
+                const haloStroke = 'rgba(0,0,0,0.65)';
+                const isMarkerSelected = selectedCell && selectedCell.x === lx && selectedCell.y === ly;
+
+                return (
+                  <g key={`marker-${c.id}`} transform={`translate(${lx + 0.5},${ly + 0.5})`} className="pointer-events-auto">
+                    {/* halo externo (maior se selecionado) */}
+                    <circle cx={0} cy={0} r={radius + (isMarkerSelected ? 0.12 : 0.06)} fill="none" stroke={haloStroke} strokeWidth={isMarkerSelected ? 0.05 : 0.03} opacity={0.95} vectorEffect="non-scaling-stroke" pointerEvents="none">
+                      {isMarkerSelected && (
+                        <animate attributeName="r" values={`${radius + 0.06};${radius + 0.16};${radius + 0.06}`} dur="1s" repeatCount="indefinite" />
+                      )}
+                    </circle>
+                    {/* marcador principal (levemente maior se selecionado) */}
+                    <circle cx={0} cy={0} r={radius + (isMarkerSelected ? 0.06 : 0)} fill={color} stroke="#000" strokeWidth={0.02} vectorEffect="non-scaling-stroke" />
+                    {/* inicial: usar branco para máxima legibilidade em tema escuro */}
+                    <text x={0} y={0.06} textAnchor="middle" dominantBaseline="middle" fontSize={fontSize} fill="#ffffff" fontWeight={700} style={{ pointerEvents: 'none' }}>{c.name.charAt(0).toUpperCase()}</text>
+                  </g>
+                );
+              })}
           </g>
         </svg>
       </div>
 
       {/* Personagens no mapa (exibido também em modo compact) */}
       <div className="mt-4">
-        <h3 className="text-lg font-medium mb-2 text-gray-900 dark:text-white">Personagens no Mapa:</h3>
+  <h3 className="text-lg font-medium mb-2 text-gray-100 dark:text-white">Personagens no Mapa:</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-          {characters.filter(char => char.location).map((char) => (
-            <div key={char.id} className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded">
-              <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                {char.name.charAt(0).toUpperCase()}
+              {characters.filter(char => char.location).map((char) => {
+            const color = char.color ?? '#2563eb';
+            // container background: usar a cor com alpha pequena (hex + alpha) se for hex de 7 chars
+            let containerBg = 'transparent';
+            if (/^#([0-9a-f]{6})$/i.test(color)) containerBg = `${color}22`; // baixa opacidade
+            const locX = char.location!.x;
+            const locY = char.location!.y;
+            const isThisSelected = selectedCell && selectedCell.x === locX && selectedCell.y === locY;
+            return (
+              <div
+                key={char.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedCell(prev => (prev && prev.x === locX && prev.y === locY) ? null : { x: locX, y: locY })}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedCell(prev => (prev && prev.x === locX && prev.y === locY) ? null : { x: locX, y: locY }); }}
+                className={`flex items-center gap-2 p-2 rounded ${isThisSelected ? 'ring-2 ring-offset-1 ring-white/30' : ''} cursor-pointer`}
+                style={{ background: containerBg }}
+              >
+                <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: color, color: '#ffffff', boxShadow: '0 0 0 1px rgba(0,0,0,0.12) inset' }}>
+                  {char.name.charAt(0).toUpperCase()}
+                </div>
+                <span className={`text-sm text-gray-100`}>{char.name} ({locX}, {locY})</span>
               </div>
-              <span className="text-sm text-gray-900 dark:text-white">{char.name} ({char.location?.x}, {char.location?.y})</span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

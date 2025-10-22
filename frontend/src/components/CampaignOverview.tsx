@@ -275,7 +275,7 @@ export default function CampaignOverview({ characters, enemies, activeCampaign, 
             {characters.map((char) => (
               <div key={char.id} className="p-4 rounded-lg bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors shadow-sm" style={{ minWidth: '240px' }}>
                 <div className="flex items-start gap-4">
-                  <div className="w-14 h-14 flex-shrink-0 bg-gray-300 dark:bg-gray-600 rounded-full flex items-center justify-center text-gray-700 dark:text-gray-300 font-bold text-lg">
+                  <div className="w-14 h-14 flex-shrink-0 rounded-full flex items-center justify-center font-bold text-lg" style={{ background: (char.color ?? '#2563eb'), color: '#ffffff' }}>
                     {char.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1">

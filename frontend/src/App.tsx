@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import './App.css'
+import { getColorForName, getRandomPaletteColor } from './utils/colors'
 import type { Character, Race, Item, Enemy, Campaign } from './types'
 import Sidebar from './components/Sidebar'
 import CharacterForm from './components/CharacterForm'
@@ -22,6 +23,7 @@ function App() {
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
   const [editedCharacter, setEditedCharacter] = useState<Character | null>(null);
   const [name, setName] = useState('');
+  const [color, setColor] = useState<string | undefined>(undefined);
   const [selectedRace, setSelectedRace] = useState<Race | null>(null);
   const [level, setLevel] = useState(1);
   const [forca, setForca] = useState(0);
@@ -111,7 +113,7 @@ function App() {
           currency: char.currency,
         };
         const location = (char as any).location_x !== null && (char as any).location_y !== null ? { x: (char as any).location_x, y: (char as any).location_y } : undefined;
-        return { ...char, inventory, location };
+        return { ...char, inventory, location, color: (char as any).color || undefined };
       }));
       setCharacters(charactersWithInventory);
     } catch (error) {
@@ -449,6 +451,9 @@ function App() {
         location_y = Math.floor(Math.random() * 21);
       }
 
+  // Use chosen color or deterministic palette color from name
+  const generatedColor = color ?? getColorForName(name || undefined) ?? getRandomPaletteColor();
+
       const response = await fetch('http://localhost:3001/characters', {
         method: 'POST',
         headers: {
@@ -474,11 +479,13 @@ function App() {
           location_x,
           location_y,
           campaign_id: activeCampaign?.id || null,
+          color: generatedColor,
         }),
       });
       if (response.ok) {
         setName('');
         setSelectedRace(null);
+        setColor(undefined);
         setLevel(1);
         setForca(0);
         setDestreza(0);
@@ -546,6 +553,7 @@ function App() {
           sabedoria: editedCharacter.sabedoria,
           carisma: editedCharacter.carisma,
           pontos_disponiveis: editedCharacter.pontos_disponiveis,
+          color: editedCharacter.color ?? null,
           xp: editedCharacter.xp,
           weapon_name: editedCharacter.weapon_name,
           weapon_attr: editedCharacter.weapon_attr,
@@ -598,6 +606,8 @@ function App() {
             setSabedoria={setSabedoria}
             setCarisma={setCarisma}
             handleSubmit={handleSubmit}
+            color={color}
+            setColor={setColor}
           />
         ) : currentView === 'enemies' ? (
           <EnemyList enemies={enemies} characters={characters} onCreateEnemy={createEnemy} />

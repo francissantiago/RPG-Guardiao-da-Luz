@@ -17,8 +17,9 @@ export default function CharacterList({ characters, selectedCharacter, onSelectC
             className={`grid grid-cols-[auto_1fr] gap-2 p-3 rounded-lg cursor-pointer ${selectedCharacter?.id === char.id ? 'bg-blue-100 dark:bg-blue-900' : 'bg-gray-50 dark:bg-gray-700'} hover:bg-gray-100 dark:hover:bg-gray-600`}
             onClick={() => onSelectCharacter(char)}
           >
-            <div className="flex flex-col justify-center tems-center gap-3">
-              <div className="w-10 h-10 bg-gray-300 dark:bg-gray-600 rounded-full flex items-center justify-center text-gray-700 dark:text-gray-300 font-bold text-sm">
+            <div className="flex flex-col justify-center items-center gap-3">
+              {/* avatar com cor do personagem e texto claro em tema escuro */}
+              <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm" style={{ background: char.color ?? '#2563eb', color: '#ffffff', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.12)' }}>
                 {char.name.charAt(0).toUpperCase()}
               </div>
               <p className="text-xs text-center text-gray-600 dark:text-gray-400 mt-1">Nível {char.level}</p>

@@ -6,6 +6,8 @@ interface CharacterFormProps {
   setName: (name: string) => void;
   selectedRace: Race | null;
   setSelectedRace: (race: Race | null) => void;
+  color?: string;
+  setColor?: (color: string) => void;
   forca: number;
   destreza: number;
   constituicao: number;
@@ -28,6 +30,8 @@ export default function CharacterForm({
   setName,
   selectedRace,
   setSelectedRace,
+  color,
+  setColor,
   forca,
   destreza,
   constituicao,
@@ -159,6 +163,10 @@ export default function CharacterForm({
           </div>
           <div className="space-y-4 col-span-2">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Estatísticas</h3>
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Cor do Personagem (opcional)</label>
+              <input type="color" value={color || '#2563eb'} onChange={(e) => setColor && setColor(e.target.value)} className="w-24 h-10 p-0 border-0" />
+            </div>
             <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md">
               <div className="grid grid-cols-3 gap-4">
                 {(() => {

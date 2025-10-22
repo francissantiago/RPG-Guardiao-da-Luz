@@ -40,6 +40,10 @@ export default function CharacterDetails({ editedCharacter, setEditedCharacter, 
               <p className="text-gray-900 dark:text-white mt-2">{editedCharacter.race}</p>
             </div>
             <div>
+              <label className="block text-gray-700 dark:text-gray-300 font-medium">Cor</label>
+              <input type="color" value={editedCharacter.color || '#2563eb'} onChange={(e) => setEditedCharacter(prev => prev ? { ...prev, color: e.target.value } : null)} className="mt-2 w-24 h-10 p-0 border-0" />
+            </div>
+            <div>
               <label className="block text-gray-700 dark:text-gray-300 font-medium">Nível:</label>
               <p className="text-gray-900 dark:text-white mt-2">{editedCharacter.level}</p>
             </div>

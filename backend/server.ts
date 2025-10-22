@@ -61,6 +61,7 @@ db.serialize(() => {
     current_pe INTEGER,
     currency INTEGER DEFAULT 300,
     campaign_id INTEGER,
+    color TEXT,
     location_x INTEGER,
     location_y INTEGER,
     FOREIGN KEY (user_id) REFERENCES users (id),
@@ -127,6 +128,9 @@ db.serialize(() => {
   // Adicionar location
   db.run(`ALTER TABLE characters ADD COLUMN location_x INTEGER`, (err: Error | null) => { if (err && !err.message.includes('duplicate column')) console.error(err); });
   db.run(`ALTER TABLE characters ADD COLUMN location_y INTEGER`, (err: Error | null) => { if (err && !err.message.includes('duplicate column')) console.error(err); });
+
+  // Adicionar color se não existir
+  db.run(`ALTER TABLE characters ADD COLUMN color TEXT`, (err: Error | null) => { if (err && !err.message.includes('duplicate column')) console.error(err); });
 
   // Adicionar campaign_id
   db.run(`ALTER TABLE characters ADD COLUMN campaign_id INTEGER REFERENCES campaigns(id)`, (err: Error | null) => { if (err && !err.message.includes('duplicate column')) console.error(err); });
@@ -242,11 +246,11 @@ app.get('/characters', (req: Request, res: Response) => {
 });
 
 app.post('/characters', (req: Request, res: Response) => {
-  const { name, race, level, user_id, forca, destreza, constituicao, inteligencia, sabedoria, carisma, pontos_disponiveis, xp, weapon_name, weapon_attr, weapon_bonus, location_x, location_y, campaign_id } = req.body;
+  const { name, race, level, user_id, forca, destreza, constituicao, inteligencia, sabedoria, carisma, pontos_disponiveis, xp, weapon_name, weapon_attr, weapon_bonus, color, location_x, location_y, campaign_id } = req.body;
   const max_pv = Math.min(5000, (constituicao + (weapon_attr === 'constituicao' ? weapon_bonus : 0)) * 250);
   const max_pe = Math.min(2000, ((inteligencia + sabedoria + carisma + (['inteligencia', 'sabedoria', 'carisma'].includes(weapon_attr) ? weapon_bonus : 0)) * 33));
   const max_pc = Math.min(5000, (constituicao + (weapon_attr === 'constituicao' ? weapon_bonus : 0)) * 250);
-  db.run('INSERT INTO characters (name, race, level, user_id, forca, destreza, constituicao, inteligencia, sabedoria, carisma, pontos_disponiveis, xp, weapon_name, weapon_attr, weapon_bonus, current_pv, current_pe, current_pc, currency, location_x, location_y, campaign_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [name, race, level || 1, user_id, forca || 0, destreza || 0, constituicao || 0, inteligencia || 0, sabedoria || 0, carisma || 0, pontos_disponiveis || 70, xp || 0, weapon_name || '', weapon_attr || '', weapon_bonus || 0, max_pv, max_pe, max_pc, 300, location_x, location_y, campaign_id], function(err: Error | null) {
+  db.run('INSERT INTO characters (name, race, level, user_id, forca, destreza, constituicao, inteligencia, sabedoria, carisma, pontos_disponiveis, xp, weapon_name, weapon_attr, weapon_bonus, color, current_pv, current_pe, current_pc, currency, location_x, location_y, campaign_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [name, race, level || 1, user_id, forca || 0, destreza || 0, constituicao || 0, inteligencia || 0, sabedoria || 0, carisma || 0, pontos_disponiveis || 70, xp || 0, weapon_name || '', weapon_attr || '', weapon_bonus || 0, color || null, max_pv, max_pe, max_pc, 300, location_x, location_y, campaign_id], function(err: Error | null) {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
@@ -257,8 +261,8 @@ app.post('/characters', (req: Request, res: Response) => {
 
 app.put('/characters/:id', (req: Request, res: Response) => {
   const { id } = req.params;
-  const { name, race, level, forca, destreza, constituicao, inteligencia, sabedoria, carisma, pontos_disponiveis, xp, weapon_name, weapon_attr, weapon_bonus, current_pv, current_pe, current_pc, location_x, location_y, campaign_id } = req.body;
-  db.run('UPDATE characters SET name = ?, race = ?, level = ?, forca = ?, destreza = ?, constituicao = ?, inteligencia = ?, sabedoria = ?, carisma = ?, pontos_disponiveis = ?, xp = ?, weapon_name = ?, weapon_attr = ?, weapon_bonus = ?, current_pv = ?, current_pe = ?, current_pc = ?, currency = ?, location_x = ?, location_y = ?, campaign_id = ? WHERE id = ?', [name, race, level, forca, destreza, constituicao, inteligencia, sabedoria, carisma, pontos_disponiveis, xp, weapon_name, weapon_attr, weapon_bonus, current_pv, current_pe, current_pc, req.body.currency || 300, location_x, location_y, campaign_id, id], function(err: Error | null) {
+  const { name, race, level, forca, destreza, constituicao, inteligencia, sabedoria, carisma, pontos_disponiveis, xp, weapon_name, weapon_attr, weapon_bonus, color, current_pv, current_pe, current_pc, location_x, location_y, campaign_id } = req.body;
+  db.run('UPDATE characters SET name = ?, race = ?, level = ?, forca = ?, destreza = ?, constituicao = ?, inteligencia = ?, sabedoria = ?, carisma = ?, pontos_disponiveis = ?, xp = ?, weapon_name = ?, weapon_attr = ?, weapon_bonus = ?, color = ?, current_pv = ?, current_pe = ?, current_pc = ?, currency = ?, location_x = ?, location_y = ?, campaign_id = ? WHERE id = ?', [name, race, level, forca, destreza, constituicao, inteligencia, sabedoria, carisma, pontos_disponiveis, xp, weapon_name, weapon_attr, weapon_bonus, color || null, current_pv, current_pe, current_pc, req.body.currency || 300, location_x, location_y, campaign_id, id], function(err: Error | null) {
     if (err) {
       res.status(500).json({ error: err.message });
       return;

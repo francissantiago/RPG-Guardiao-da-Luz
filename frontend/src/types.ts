@@ -24,6 +24,7 @@ export interface Character {
     x: number;
     y: number;
   };
+  color?: string; // cor opcional para representar o personagem no mapa e nos cards
   inventory?: {
     equipped: {
       [key: string]: Item | null;
