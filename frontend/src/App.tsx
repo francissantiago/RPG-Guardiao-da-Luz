@@ -305,11 +305,18 @@ function App() {
       });
       if (response.ok) {
         fetchEnemies();
+        try { toast.show('Inimigo criado com sucesso', 'success'); } catch {}
       } else {
-        console.error('Erro ao criar inimigo');
+        try {
+          const err = await response.json();
+          toast.show(err.error || 'Erro ao criar inimigo', 'error');
+        } catch (e) {
+          console.error('Erro ao criar inimigo');
+        }
       }
     } catch (error) {
       console.error('Erro ao criar inimigo:', error);
+      try { toast.show('Erro ao criar inimigo', 'error'); } catch {}
     }
   };
 
@@ -514,12 +521,14 @@ function App() {
       });
         if (response.ok) {
           fetchCharacters();
+          try { toast.show('Personagem evoluiu de nível!', 'success'); } catch {}
         } else {
           const error = await response.json();
           toast.show(error.error || 'Erro ao subir nível', 'error');
         }
     } catch (error) {
       console.error('Erro ao subir nível:', error);
+      try { toast.show('Erro ao subir nível', 'error'); } catch {}
     }
   };
 
@@ -534,9 +543,11 @@ function App() {
       });
       if (response.ok) {
         fetchCharacters();
+        try { toast.show('XP adicionada com sucesso', 'success'); } catch {}
       }
     } catch (error) {
       console.error('Erro ao adicionar XP:', error);
+      try { toast.show('Erro ao adicionar XP', 'error'); } catch {}
     }
   };
 

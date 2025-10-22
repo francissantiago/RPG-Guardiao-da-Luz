@@ -84,6 +84,17 @@ button:focus-visible {
   }
 }
 
+/* Toast animations */
+@keyframes toast-in {
+  from { transform: translateX(20%) translateY(8px); opacity: 0; }
+  to { transform: translateX(0) translateY(0); opacity: 1; }
+}
+
+@keyframes toast-out {
+  from { transform: translateX(0) translateY(0); opacity: 1; }
+  to { transform: translateX(20%) translateY(8px); opacity: 0; }
+}
+
 /* Custom progress bars */
 .progress-pc::-webkit-progress-bar {
   background: #e5e7eb;
