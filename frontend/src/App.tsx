@@ -163,6 +163,7 @@ function App() {
         
         // Posicionar personagens no mapa da nova campanha
         await positionCharactersInCampaign(data.id);
+        try { toast.show('Campanha criada com sucesso', 'success'); } catch {}
         
         return data;
       }
@@ -499,6 +500,7 @@ function App() {
         setCarisma(0);
         setPontosDisponiveis(70);
         fetchCharacters();
+        try { toast.show('Personagem criado com sucesso', 'success'); } catch {}
       }
     } catch (error) {
       console.error('Erro ao criar personagem:', error);
@@ -571,6 +573,7 @@ function App() {
       if (response.ok) {
         fetchCharacters();
         setSelectedCharacter(editedCharacter);
+        try { toast.show('Personagem atualizado com sucesso', 'success'); } catch {}
       }
     } catch (error) {
       console.error('Erro ao atualizar personagem:', error);
