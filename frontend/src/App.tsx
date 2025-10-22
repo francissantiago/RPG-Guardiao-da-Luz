@@ -11,6 +11,7 @@ import EnemyList from './components/EnemyList'
 import DiceRoller from './components/DiceRoller'
 import SquareMapGenerator from './components/SquareMapGenerator'
 import CampaignOverview from './components/CampaignOverview'
+import { ToastProvider } from './components/ToastProvider'
 
 function App() {
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -510,7 +511,11 @@ function App() {
         fetchCharacters();
       } else {
         const error = await response.json();
-        alert(error.error);
+        // use toast via DOM fallback if context not available
+        try {
+          const toast = (window as any).__APP_TOAST__ as ((m:string,t?:string)=>void) | undefined;
+          if (toast) toast(error.error || 'Erro ao subir nível', 'error');
+        } catch {}
       }
     } catch (error) {
       console.error('Erro ao subir nível:', error);
@@ -574,6 +579,7 @@ function App() {
   };
 
   return (
+    <ToastProvider>
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex w-full">
       <Sidebar
         currentView={currentView}
@@ -651,6 +657,7 @@ function App() {
         )}
       </main>
     </div>
+    </ToastProvider>
   )
 }
 

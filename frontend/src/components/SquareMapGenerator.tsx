@@ -430,11 +430,11 @@ export default function SquareMapGenerator({ size = 10, seed = Math.random(), ch
                               // atualizar seleção de célula
                               setSelectedCell({ x: data.to.x, y: data.to.y });
                             } else {
-                              alert(data.error || 'Erro ao mover personagem');
+                              try { (window as any).__APP_TOAST__?.(data.error || 'Erro ao mover personagem', 'error'); } catch { alert(data.error || 'Erro ao mover personagem'); }
                             }
                           } catch (e) {
                             console.error('Erro ao chamar step:', e);
-                            alert('Erro de conexão ao mover personagem');
+                            try { (window as any).__APP_TOAST__?.('Erro de conexão ao mover personagem', 'error'); } catch { alert('Erro de conexão ao mover personagem'); }
                           }
                           return;
                         }
