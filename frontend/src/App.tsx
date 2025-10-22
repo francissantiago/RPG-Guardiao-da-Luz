@@ -11,7 +11,7 @@ import EnemyList from './components/EnemyList'
 import DiceRoller from './components/DiceRoller'
 import SquareMapGenerator from './components/SquareMapGenerator'
 import CampaignOverview from './components/CampaignOverview'
-import { ToastProvider } from './components/ToastProvider'
+import { useToast } from './components/ToastProvider'
 
 function App() {
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -72,6 +72,9 @@ function App() {
       setPontosDisponiveis(70);
     }
   }, [selectedRace]);
+
+  // Toast hook (provider wraps App in main.tsx)
+  const toast = useToast();
 
   const fetchCharacters = async () => {
     try {
@@ -507,16 +510,12 @@ function App() {
       const response = await fetch(`http://localhost:3001/characters/${id}/levelup`, {
         method: 'PUT',
       });
-      if (response.ok) {
-        fetchCharacters();
-      } else {
-        const error = await response.json();
-        // use toast via DOM fallback if context not available
-        try {
-          const toast = (window as any).__APP_TOAST__ as ((m:string,t?:string)=>void) | undefined;
-          if (toast) toast(error.error || 'Erro ao subir nível', 'error');
-        } catch {}
-      }
+        if (response.ok) {
+          fetchCharacters();
+        } else {
+          const error = await response.json();
+          toast.show(error.error || 'Erro ao subir nível', 'error');
+        }
     } catch (error) {
       console.error('Erro ao subir nível:', error);
     }
@@ -579,7 +578,6 @@ function App() {
   };
 
   return (
-    <ToastProvider>
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex w-full">
       <Sidebar
         currentView={currentView}
@@ -656,8 +654,7 @@ function App() {
           </div>
         )}
       </main>
-    </div>
-    </ToastProvider>
+  </div>
   )
 }
 

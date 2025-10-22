@@ -25,8 +25,9 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       {children}
       <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
         {toasts.map(t => (
-          <div key={t.id} className={`max-w-xs px-3 py-2 rounded shadow-md text-white ${t.type === 'error' ? 'bg-red-600' : t.type === 'success' ? 'bg-green-600' : 'bg-gray-800'}`}>
-            {t.message}
+          <div key={t.id} className={`max-w-xs px-3 py-2 rounded shadow-md text-white flex items-start gap-3 justify-between transform transition-all duration-200 ${t.type === 'error' ? 'bg-red-600' : t.type === 'success' ? 'bg-green-600' : 'bg-gray-800'}`}>
+            <div className="flex-1 text-sm">{t.message}</div>
+            <button onClick={() => setToasts(s => s.filter(x => x.id !== t.id))} className="text-white opacity-80 hover:opacity-100 ml-2 text-xs">Fechar</button>
           </div>
         ))}
       </div>

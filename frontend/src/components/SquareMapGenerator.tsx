@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { useToast } from './ToastProvider';
 import type { Character } from '../types';
 
 // Tipos para coordenadas quadradas
@@ -78,6 +79,13 @@ interface HexMapGeneratorProps {
 }
 
 export default function SquareMapGenerator({ size = 10, seed = Math.random(), characters = [], compact = false, selectedCharacter = null, onCharacterMoved }: HexMapGeneratorProps) {
+  const toast = (() => {
+    try {
+      return useToast();
+    } catch (e) {
+      return null;
+    }
+  })();
   const [mapSize, setMapSize] = useState<number>(size);
   const [currentSeed, setCurrentSeed] = useState<number>(seed);
   // Estado para célula selecionada
@@ -289,6 +297,8 @@ export default function SquareMapGenerator({ size = 10, seed = Math.random(), ch
     const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
     return luminance < 0.6; // threshold: adjust if necessary
   };
+  // prevent unused-warning by referencing it in a no-op when compact mode changes
+  useEffect(() => { void isDarkColor; }, [compact]);
 
   // Handler para gerar um novo mapa (novo seed)
   const generateNewMap = () => {
@@ -430,11 +440,13 @@ export default function SquareMapGenerator({ size = 10, seed = Math.random(), ch
                               // atualizar seleção de célula
                               setSelectedCell({ x: data.to.x, y: data.to.y });
                             } else {
-                              try { (window as any).__APP_TOAST__?.(data.error || 'Erro ao mover personagem', 'error'); } catch { alert(data.error || 'Erro ao mover personagem'); }
-                            }
+                                if (toast) toast.show(data.error || 'Erro ao mover personagem', 'error');
+                                else console.error(data.error || 'Erro ao mover personagem');
+                              }
                           } catch (e) {
                             console.error('Erro ao chamar step:', e);
-                            try { (window as any).__APP_TOAST__?.('Erro de conexão ao mover personagem', 'error'); } catch { alert('Erro de conexão ao mover personagem'); }
+                              if (toast) toast.show('Erro de conexão ao mover personagem', 'error');
+                              else console.error('Erro de conexão ao mover personagem');
                           }
                           return;
                         }
