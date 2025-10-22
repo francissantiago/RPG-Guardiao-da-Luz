@@ -26,6 +26,19 @@ db.serialize(() => {
     role TEXT NOT NULL CHECK (role IN ('gm', 'player'))
   )`);
 
+  db.run(`CREATE TABLE IF NOT EXISTS campaigns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('active', 'completed', 'paused')) DEFAULT 'active',
+    map_seed INTEGER NOT NULL,
+    map_size INTEGER NOT NULL DEFAULT 5,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // Migração para adicionar map_size se não existir
+  db.run(`ALTER TABLE campaigns ADD COLUMN map_size INTEGER DEFAULT 5`, (err: Error | null) => { if (err && !err.message.includes('duplicate column')) console.error(err); });
+
   db.run(`CREATE TABLE IF NOT EXISTS characters (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -47,7 +60,11 @@ db.serialize(() => {
     current_pc INTEGER,
     current_pe INTEGER,
     currency INTEGER DEFAULT 300,
-    FOREIGN KEY (user_id) REFERENCES users (id)
+    campaign_id INTEGER,
+    location_x INTEGER,
+    location_y INTEGER,
+    FOREIGN KEY (user_id) REFERENCES users (id),
+    FOREIGN KEY (campaign_id) REFERENCES campaigns (id)
   )`);
 
     db.run(`CREATE TABLE IF NOT EXISTS enemies (
@@ -111,6 +128,9 @@ db.serialize(() => {
   db.run(`ALTER TABLE characters ADD COLUMN location_x INTEGER`, (err: Error | null) => { if (err && !err.message.includes('duplicate column')) console.error(err); });
   db.run(`ALTER TABLE characters ADD COLUMN location_y INTEGER`, (err: Error | null) => { if (err && !err.message.includes('duplicate column')) console.error(err); });
 
+  // Adicionar campaign_id
+  db.run(`ALTER TABLE characters ADD COLUMN campaign_id INTEGER REFERENCES campaigns(id)`, (err: Error | null) => { if (err && !err.message.includes('duplicate column')) console.error(err); });
+
   // Inserir items padrão se não existirem
   db.run(`INSERT OR IGNORE INTO items (id, name, type, bonus_attr, bonus_value, price) VALUES
     (1, 'Espada de Ferro', 'weapon', 'forca', 5, 100),
@@ -165,6 +185,51 @@ app.post('/users', (req: Request, res: Response) => {
   });
 });
 
+// Rotas para campanhas
+app.get('/campaigns', (req: Request, res: Response) => {
+  db.all('SELECT * FROM campaigns ORDER BY created_at DESC', [], (err: Error | null, rows: any[]) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ campaigns: rows });
+  });
+});
+
+app.get('/campaigns/active', (req: Request, res: Response) => {
+  db.get('SELECT * FROM campaigns WHERE status = ? ORDER BY created_at DESC LIMIT 1', ['active'], (err: Error | null, row: any) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ campaign: row || null });
+  });
+});
+
+app.post('/campaigns', (req: Request, res: Response) => {
+  const { name, map_size } = req.body;
+  const map_seed = Math.floor(Math.random() * 1000000);
+  db.run('INSERT INTO campaigns (name, status, map_seed, map_size, created_at, updated_at) VALUES (?, ?, ?, ?, datetime("now"), datetime("now"))', [name, 'active', map_seed, map_size || 5], function(err: Error | null) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ id: this.lastID, map_seed, map_size: map_size || 5 });
+  });
+});
+
+app.put('/campaigns/:id/status', (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  db.run('UPDATE campaigns SET status = ?, updated_at = datetime("now") WHERE id = ?', [status, id], function(err: Error | null) {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json({ changes: this.changes });
+  });
+});
+
 // Rotas para personagens
 app.get('/characters', (req: Request, res: Response) => {
   db.all('SELECT * FROM characters', [], (err: Error | null, rows: any[]) => {
@@ -177,11 +242,11 @@ app.get('/characters', (req: Request, res: Response) => {
 });
 
 app.post('/characters', (req: Request, res: Response) => {
-  const { name, race, level, user_id, forca, destreza, constituicao, inteligencia, sabedoria, carisma, pontos_disponiveis, xp, weapon_name, weapon_attr, weapon_bonus, location_x, location_y } = req.body;
+  const { name, race, level, user_id, forca, destreza, constituicao, inteligencia, sabedoria, carisma, pontos_disponiveis, xp, weapon_name, weapon_attr, weapon_bonus, location_x, location_y, campaign_id } = req.body;
   const max_pv = Math.min(5000, (constituicao + (weapon_attr === 'constituicao' ? weapon_bonus : 0)) * 250);
   const max_pe = Math.min(2000, ((inteligencia + sabedoria + carisma + (['inteligencia', 'sabedoria', 'carisma'].includes(weapon_attr) ? weapon_bonus : 0)) * 33));
   const max_pc = Math.min(5000, (constituicao + (weapon_attr === 'constituicao' ? weapon_bonus : 0)) * 250);
-  db.run('INSERT INTO characters (name, race, level, user_id, forca, destreza, constituicao, inteligencia, sabedoria, carisma, pontos_disponiveis, xp, weapon_name, weapon_attr, weapon_bonus, current_pv, current_pe, current_pc, currency, location_x, location_y) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [name, race, level || 1, user_id, forca || 0, destreza || 0, constituicao || 0, inteligencia || 0, sabedoria || 0, carisma || 0, pontos_disponiveis || 70, xp || 0, weapon_name || '', weapon_attr || '', weapon_bonus || 0, max_pv, max_pe, max_pc, 300, location_x, location_y], function(err: Error | null) {
+  db.run('INSERT INTO characters (name, race, level, user_id, forca, destreza, constituicao, inteligencia, sabedoria, carisma, pontos_disponiveis, xp, weapon_name, weapon_attr, weapon_bonus, current_pv, current_pe, current_pc, currency, location_x, location_y, campaign_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [name, race, level || 1, user_id, forca || 0, destreza || 0, constituicao || 0, inteligencia || 0, sabedoria || 0, carisma || 0, pontos_disponiveis || 70, xp || 0, weapon_name || '', weapon_attr || '', weapon_bonus || 0, max_pv, max_pe, max_pc, 300, location_x, location_y, campaign_id], function(err: Error | null) {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
@@ -192,8 +257,8 @@ app.post('/characters', (req: Request, res: Response) => {
 
 app.put('/characters/:id', (req: Request, res: Response) => {
   const { id } = req.params;
-  const { name, race, level, forca, destreza, constituicao, inteligencia, sabedoria, carisma, pontos_disponiveis, xp, weapon_name, weapon_attr, weapon_bonus, current_pv, current_pe, current_pc, location_x, location_y } = req.body;
-  db.run('UPDATE characters SET name = ?, race = ?, level = ?, forca = ?, destreza = ?, constituicao = ?, inteligencia = ?, sabedoria = ?, carisma = ?, pontos_disponiveis = ?, xp = ?, weapon_name = ?, weapon_attr = ?, weapon_bonus = ?, current_pv = ?, current_pe = ?, current_pc = ?, currency = ?, location_x = ?, location_y = ? WHERE id = ?', [name, race, level, forca, destreza, constituicao, inteligencia, sabedoria, carisma, pontos_disponiveis, xp, weapon_name, weapon_attr, weapon_bonus, current_pv, current_pe, current_pc, req.body.currency || 300, location_x, location_y, id], function(err: Error | null) {
+  const { name, race, level, forca, destreza, constituicao, inteligencia, sabedoria, carisma, pontos_disponiveis, xp, weapon_name, weapon_attr, weapon_bonus, current_pv, current_pe, current_pc, location_x, location_y, campaign_id } = req.body;
+  db.run('UPDATE characters SET name = ?, race = ?, level = ?, forca = ?, destreza = ?, constituicao = ?, inteligencia = ?, sabedoria = ?, carisma = ?, pontos_disponiveis = ?, xp = ?, weapon_name = ?, weapon_attr = ?, weapon_bonus = ?, current_pv = ?, current_pe = ?, current_pc = ?, currency = ?, location_x = ?, location_y = ?, campaign_id = ? WHERE id = ?', [name, race, level, forca, destreza, constituicao, inteligencia, sabedoria, carisma, pontos_disponiveis, xp, weapon_name, weapon_attr, weapon_bonus, current_pv, current_pe, current_pc, req.body.currency || 300, location_x, location_y, campaign_id, id], function(err: Error | null) {
     if (err) {
       res.status(500).json({ error: err.message });
       return;

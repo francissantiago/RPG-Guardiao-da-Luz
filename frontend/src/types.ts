@@ -19,6 +19,11 @@ export interface Character {
   current_pc: number;
   current_pe: number;
   currency: number;
+  campaign_id?: number;
+  location?: {
+    x: number;
+    y: number;
+  };
   inventory?: {
     equipped: {
       [key: string]: Item | null;
@@ -26,6 +31,16 @@ export interface Character {
     items: Item[];
     currency: number;
   };
+}
+
+export interface Campaign {
+  id: number;
+  name: string;
+  status: 'active' | 'completed' | 'paused';
+  map_seed: number;
+  map_size: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Item {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import './App.css'
-import type { Character, Race, Item, Enemy } from './types'
+import type { Character, Race, Item, Enemy, Campaign } from './types'
 import Sidebar from './components/Sidebar'
 import CharacterForm from './components/CharacterForm'
 import CharacterList from './components/CharacterList'
@@ -14,6 +14,7 @@ import CampaignOverview from './components/CampaignOverview'
 function App() {
   const [characters, setCharacters] = useState<Character[]>([]);
   const [enemies, setEnemies] = useState<Enemy[]>([]);
+  const [activeCampaign, setActiveCampaign] = useState<Campaign | null>(null);
       const [currentView, setCurrentView] = useState<'create' | 'view' | 'enemies' | 'dice' | 'maps' | 'campaign'>(() => {
     const savedView = localStorage.getItem('currentView') as 'create' | 'view' | 'enemies' | 'dice' | 'maps' | 'campaign';
     return savedView || 'campaign';
@@ -38,6 +39,7 @@ function App() {
   useEffect(() => {
     fetchCharacters();
     fetchEnemies();
+    fetchCampaigns();
   }, []);
 
   useEffect(() => {
@@ -108,7 +110,8 @@ function App() {
           })),
           currency: char.currency,
         };
-        return { ...char, inventory };
+        const location = (char as any).location_x !== null && (char as any).location_y !== null ? { x: (char as any).location_x, y: (char as any).location_y } : undefined;
+        return { ...char, inventory, location };
       }));
       setCharacters(charactersWithInventory);
     } catch (error) {
@@ -123,6 +126,164 @@ function App() {
       setEnemies(data.enemies);
     } catch (error) {
       console.error('Erro ao buscar inimigos:', error);
+    }
+  };
+
+  const fetchCampaigns = async () => {
+    try {
+      // Buscar campanha ativa
+      const activeResponse = await fetch('http://localhost:3001/campaigns/active');
+      const activeData = await activeResponse.json();
+      setActiveCampaign(activeData.campaign);
+    } catch (error) {
+      console.error('Erro ao buscar campanhas:', error);
+    }
+  };
+
+  const createCampaign = async (name: string, mapSize: number = 5) => {
+    try {
+      const response = await fetch('http://localhost:3001/campaigns', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name, map_size: mapSize }),
+      });
+      const data = await response.json();
+      
+      if (response.ok) {
+        // Atualizar campanhas e buscar a ativa
+        await fetchCampaigns();
+        
+        // Posicionar personagens no mapa da nova campanha
+        await positionCharactersInCampaign(data.id);
+        
+        return data;
+      }
+    } catch (error) {
+      console.error('Erro ao criar campanha:', error);
+    }
+  };
+
+  const endCampaign = async () => {
+    if (!activeCampaign) return;
+    try {
+      const response = await fetch(`http://localhost:3001/campaigns/${activeCampaign.id}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: 'completed' }),
+      });
+      
+      if (response.ok) {
+        // Atualizar campanhas para refletir mudança
+        await fetchCampaigns();
+      }
+    } catch (error) {
+      console.error('Erro ao encerrar campanha:', error);
+    }
+  };
+
+  const positionCharactersInCampaign = async (campaignId: number) => {
+    try {
+      // Buscar informações da campanha para obter o tamanho do mapa
+      const campaignResponse = await fetch(`http://localhost:3001/campaigns`);
+      const campaignData = await campaignResponse.json();
+      const campaign = campaignData.campaigns.find((c: any) => c.id === campaignId);
+      const mapSize = campaign?.map_size || 5;
+      
+      // Calcular dimensões do mapa baseadas na lógica do SquareMapGenerator
+      // Para size=5: width = 5 * 3 = 15, então x vai de 0 até 15*2+1-1 = 30
+      // height = 5, então y vai de 0 até 5*2+1-1 = 10
+      const mapWidth = mapSize * 6;  // Para size=5: 30 (0-30)
+      const mapHeight = mapSize * 2; // Para size=5: 10 (0-10)
+      
+      // Buscar todos os personagens
+      const charsResponse = await fetch('http://localhost:3001/characters');
+      const charsData = await charsResponse.json();
+      
+      // Função de ruído idêntica ao SquareMapGenerator
+      const noise = (x: number, y: number, seed: number): number => {
+        const n = Math.sin(x * 12.9898 + y * 78.233 + seed * 43758.5453) * 43758.5453;
+        return n - Math.floor(n);
+      };
+      
+      // Construir lista de todas as células transitáveis (usando a função exata do mapa)
+      const walkableCells: { x: number; y: number }[] = [];
+      for (let x = 0; x <= mapWidth; x++) {
+        for (let y = 0; y <= mapHeight; y++) {
+          const elevation = noise(x * 0.1, y * 0.1, campaign.map_seed);
+          const moisture = noise(x * 0.05 + 100, y * 0.05 + 100, campaign.map_seed);
+          const temperature = 1 - Math.abs(y) / mapSize;
+          const isBorder = Math.abs(x) > mapSize * 2.5 || Math.abs(y) > mapSize * 0.7;
+
+          let terrainType = 'grass';
+          if (isBorder && elevation > 0.5) {
+            terrainType = 'mountain';
+          } else if (elevation > 0.7) {
+            terrainType = temperature > 0.3 ? 'mountain' : 'snow';
+          } else if (moisture > 0.6) {
+            terrainType = elevation > 0.3 ? 'swamp' : 'water';
+          } else if (temperature < 0.2) {
+            terrainType = 'snow';
+          } else if (temperature > 0.8 && moisture < 0.3) {
+            terrainType = 'desert';
+          } else if (elevation > 0.4) {
+            terrainType = 'forest';
+          } else {
+            terrainType = 'grass';
+          }
+
+          // Apenas células não-mountain e não-water são consideradas transitáveis
+          if (!['mountain', 'water'].includes(terrainType)) {
+            walkableCells.push({ x, y });
+          }
+        }
+      }
+
+      if (walkableCells.length === 0) {
+        console.error('Mapa sem células transitáveis — todos os personagens serão posicionados no centro.');
+      }
+
+      // Embaralhar a lista para distribuição aleatória sem sobreposição
+      for (let i = walkableCells.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [walkableCells[i], walkableCells[j]] = [walkableCells[j], walkableCells[i]];
+      }
+
+      let walkableIndex = 0;
+      for (const char of charsData.characters) {
+        let location_x = Math.floor(mapWidth / 2);
+        let location_y = Math.floor(mapHeight / 2);
+
+        if (walkableCells.length > 0 && walkableIndex < walkableCells.length) {
+          const cell = walkableCells[walkableIndex++];
+          location_x = cell.x;
+          location_y = cell.y;
+        } else {
+          // fallback: centro do mapa
+          console.warn(`Fallback de posicionamento para ${char.name}: (${location_x}, ${location_y})`);
+        }
+
+        await fetch(`http://localhost:3001/characters/${char.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ...char,
+            campaign_id: campaignId,
+            location_x,
+            location_y,
+          }),
+        });
+      }
+      
+      // Recarregar personagens com as novas posições
+      await fetchCharacters();
+    } catch (error) {
+      console.error('Erro ao posicionar personagens:', error);
     }
   };
 
@@ -161,6 +322,133 @@ function App() {
       const effectiveCarisma = carisma + (selectedRace?.weapon.attr === 'carisma' ? selectedRace.weapon.bonus : 0);
       const max_pv = Math.min(5000, effectiveConstituicao * 250);
       const max_pe = Math.min(2000, (effectiveInteligencia + effectiveSabedoria + effectiveCarisma) * 33);
+
+      // Se há uma campanha ativa, posicionar o personagem no mapa da campanha
+      let location_x = 0;
+      let location_y = 0;
+
+      if (activeCampaign) {
+        // Usar a mesma lógica de posicionamento da campanha
+        const mapSize = activeCampaign.map_size || 5;
+        const mapWidth = mapSize * 6;
+        const mapHeight = mapSize * 2;
+
+        // Função de ruído idêntica ao SquareMapGenerator
+        const noise = (x: number, y: number, seed: number): number => {
+          const n = Math.sin(x * 12.9898 + y * 78.233 + seed * 43758.5453) * 43758.5453;
+          return n - Math.floor(n);
+        };
+
+        // Função para determinar se uma coordenada é transitável (versão flexível para posicionamento)
+        const isWalkableForPlacement = (x: number, y: number, seed: number, mapSize: number, strict: boolean = true): boolean => {
+          const elevation = noise(x * 0.1, y * 0.1, seed);
+          const moisture = noise(x * 0.05 + 100, y * 0.05 + 100, seed);
+          const temperature = 1 - Math.abs(y) / mapSize;
+
+          // Em modo strict, usar as mesmas regras do mapa
+          // Em modo relaxed, reduzir as restrições de borda
+          const borderThreshold = strict ? 2.5 : 4.0; // Permitir bordas maiores no modo relaxed
+          const isBorder = Math.abs(x) > mapSize * borderThreshold || Math.abs(y) > mapSize * (strict ? 0.7 : 1.0);
+
+          let terrainType: string;
+
+          if (isBorder && elevation > 0.5) {
+            terrainType = 'mountain';
+          } else if (elevation > 0.7) {
+            terrainType = temperature > 0.3 ? 'mountain' : 'snow';
+          } else if (moisture > 0.6) {
+            terrainType = elevation > 0.3 ? 'swamp' : 'water';
+          } else if (temperature < 0.2) {
+            terrainType = 'snow';
+          } else if (temperature > 0.8 && moisture < 0.3) {
+            terrainType = 'desert';
+          } else if (elevation > 0.4) {
+            terrainType = 'forest';
+          } else {
+            terrainType = 'grass';
+          }
+
+          // Em modo strict: só terrains walkable
+          // Em modo relaxed: permitir snow também (menos pior que mountain/water)
+          if (strict) {
+            return !['mountain', 'water'].includes(terrainType);
+          } else {
+            return !['mountain', 'water'].includes(terrainType) || terrainType === 'snow';
+          }
+        };
+
+        // Tentar encontrar uma posição válida no mapa da campanha
+        let attempts = 0;
+        const maxAttempts = 100;
+        let foundPosition = false;
+
+        do {
+          location_x = Math.floor(Math.random() * (mapWidth + 1));
+          location_y = Math.floor(Math.random() * (mapHeight + 1));
+          attempts++;
+
+          if (isWalkableForPlacement(location_x, location_y, activeCampaign.map_seed, mapSize, true)) {
+            foundPosition = true;
+            break;
+          }
+        } while (attempts < maxAttempts);
+
+        // Se não encontrou em modo strict, tentar modo relaxed
+        if (!foundPosition) {
+          console.warn(`Não encontrou posição transitável estrita para novo personagem, tentando modo relaxed`);
+          attempts = 0;
+          const maxRelaxedAttempts = 200;
+
+          do {
+            location_x = Math.floor(Math.random() * (mapWidth + 1));
+            location_y = Math.floor(Math.random() * (mapHeight + 1));
+            attempts++;
+
+            if (isWalkableForPlacement(location_x, location_y, activeCampaign.map_seed, mapSize, false)) {
+              foundPosition = true;
+              console.log(`Encontrada posição relaxed para novo personagem: (${location_x}, ${location_y})`);
+              break;
+            }
+          } while (attempts < maxRelaxedAttempts);
+        }
+
+        // Se ainda não encontrou, usar busca exaustiva
+        if (!foundPosition) {
+          console.error(`FALHA CRÍTICA: Não encontrou posição adequada para novo personagem, usando busca exaustiva`);
+
+          for (let testX = 0; testX <= mapWidth && !foundPosition; testX++) {
+            for (let testY = 0; testY <= mapHeight && !foundPosition; testY++) {
+              // Aceitar qualquer terreno que não seja mountain
+              const elevation = noise(testX * 0.1, testY * 0.1, activeCampaign.map_seed);
+              const moisture = noise(testX * 0.05 + 100, testY * 0.05 + 100, activeCampaign.map_seed);
+
+              let terrainType = 'grass';
+              if (elevation > 0.7) terrainType = 'mountain';
+              else if (moisture > 0.6) terrainType = elevation > 0.3 ? 'swamp' : 'water';
+              else if (elevation > 0.4) terrainType = 'forest';
+
+              if (terrainType !== 'mountain') {
+                location_x = testX;
+                location_y = testY;
+                foundPosition = true;
+                console.warn(`POSIÇÃO DE EMERGÊNCIA para novo personagem: (${testX}, ${testY}) - Terreno: ${terrainType}`);
+              }
+            }
+          }
+        }
+
+        // Último recurso: centro do mapa
+        if (!foundPosition) {
+          console.error(`ERRO CRÍTICO: Nenhuma posição segura encontrada para novo personagem!`);
+          location_x = Math.floor(mapWidth / 2);
+          location_y = Math.floor(mapHeight / 2);
+        }
+      } else {
+        // Se não há campanha ativa, usar posições aleatórias simples (fallback)
+        location_x = Math.floor(Math.random() * 61);
+        location_y = Math.floor(Math.random() * 21);
+      }
+
       const response = await fetch('http://localhost:3001/characters', {
         method: 'POST',
         headers: {
@@ -183,6 +471,9 @@ function App() {
           weapon_bonus: selectedRace?.weapon.bonus || 0,
           current_pv: max_pv,
           current_pe: max_pe,
+          location_x,
+          location_y,
+          campaign_id: activeCampaign?.id || null,
         }),
       });
       if (response.ok) {
@@ -261,6 +552,8 @@ function App() {
           weapon_bonus: editedCharacter.weapon_bonus,
           current_pv: editedCharacter.current_pv,
           current_pe: editedCharacter.current_pe,
+          location_x: editedCharacter.location?.x,
+          location_y: editedCharacter.location?.y,
         }),
       });
       if (response.ok) {
@@ -309,11 +602,18 @@ function App() {
         ) : currentView === 'enemies' ? (
           <EnemyList enemies={enemies} characters={characters} onCreateEnemy={createEnemy} />
         ) : currentView === 'dice' ? (
-          <DiceRoller characters={characters} enemies={enemies} onUpdateCharacter={handleUpdateCharacter} />
+          <DiceRoller characters={characters} />
         ) : currentView === 'maps' ? (
           <SquareMapGenerator />
         ) : currentView === 'campaign' ? (
-          <CampaignOverview characters={characters} enemies={enemies} />
+          <CampaignOverview 
+            characters={characters} 
+            enemies={enemies} 
+            onUpdateCharacter={handleUpdateCharacter}
+            activeCampaign={activeCampaign}
+            onCreateCampaign={createCampaign}
+            onEndCampaign={endCampaign}
+          />
         ) : (
           <div className="h-full grid grid-cols-[0.5fr_1fr_1fr] gap-4">
             <CharacterList

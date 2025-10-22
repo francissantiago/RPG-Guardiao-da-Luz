@@ -1,5 +1,6 @@
 
-import type { Character, Enemy } from '../types';
+import { useState } from 'react';
+import type { Character, Enemy, Campaign } from '../types';
 import { useDiceRoller } from '../hooks/useDiceRoller';
 import SquareMapGenerator from './SquareMapGenerator';
 
@@ -7,21 +8,150 @@ interface CampaignOverviewProps {
   characters: Character[];
   enemies: Enemy[];
   onUpdateCharacter?: (character: Character) => void;
+  activeCampaign: Campaign | null;
+  onCreateCampaign: (name: string, mapSize: number) => Promise<void>;
+  onEndCampaign: () => Promise<void>;
 }
 
-export default function CampaignOverview({ characters, enemies }: CampaignOverviewProps) {
+export default function CampaignOverview({ characters, enemies, activeCampaign, onCreateCampaign, onEndCampaign }: CampaignOverviewProps) {
   const dice = useDiceRoller(characters);
+  const [isCreatingCampaign, setIsCreatingCampaign] = useState(false);
+  const [campaignName, setCampaignName] = useState('');
+  const [mapSize, setMapSize] = useState(5);
+  const [isEndingCampaign, setIsEndingCampaign] = useState(false);
 
+  const handleCreateCampaign = async () => {
+    if (!campaignName.trim()) return;
+    setIsCreatingCampaign(true);
+    try {
+      await onCreateCampaign(campaignName, mapSize);
+      setCampaignName('');
+      setMapSize(5);
+    } finally {
+      setIsCreatingCampaign(false);
+    }
+  };
+
+  const handleEndCampaign = async () => {
+    if (!confirm('Tem certeza que deseja encerrar esta campanha? Esta ação não pode ser desfeita.')) {
+      return;
+    }
+    
+    setIsEndingCampaign(true);
+    try {
+      await onEndCampaign();
+    } finally {
+      setIsEndingCampaign(false);
+    }
+  };
+
+  // Se não há campanha ativa, mostrar tela de criação
+  if (!activeCampaign) {
+    return (
+      <div className="mx-auto max-w-4xl space-y-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 text-center">
+          <div className="mb-6">
+            <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+              🏰 Nenhuma Campanha Ativa
+            </h1>
+            <p className="text-lg text-gray-600 dark:text-gray-400">
+              Para começar sua aventura, você precisa iniciar uma nova campanha.
+              Isso irá gerar um mapa procedural e posicionar seus personagens nele.
+            </p>
+          </div>
+
+          <div className="max-w-md mx-auto">
+            <div className="mb-4">
+              <label htmlFor="campaignName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Nome da Campanha
+              </label>
+              <input
+                id="campaignName"
+                type="text"
+                value={campaignName}
+                onChange={(e) => setCampaignName(e.target.value)}
+                placeholder="Digite o nome da sua campanha..."
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                disabled={isCreatingCampaign}
+              />
+            </div>
+
+            <div className="mb-6">
+              <label htmlFor="mapSize" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Tamanho do Mapa
+              </label>
+              <select
+                id="mapSize"
+                value={mapSize}
+                onChange={(e) => setMapSize(parseInt(e.target.value))}
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                disabled={isCreatingCampaign}
+              >
+                <option value={3}>Pequeno (3x3 setores)</option>
+                <option value={5}>Médio (5x5 setores) - Recomendado</option>
+                <option value={7}>Grande (7x7 setores)</option>
+                <option value={9}>Enorme (9x9 setores)</option>
+              </select>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                O tamanho afeta a área explorável e o número de encontros possíveis
+              </p>
+            </div>
+
+            <button
+              onClick={handleCreateCampaign}
+              disabled={!campaignName.trim() || isCreatingCampaign}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+            >
+              {isCreatingCampaign ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  Criando Campanha...
+                </>
+              ) : (
+                <>
+                  🚀 Iniciar Nova Campanha
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Se há campanha ativa, mostrar a visão normal da campanha
   return (
     <div className="mx-auto space-y-6">
         {/* Cabeçalho da Campanha */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            🏰 Visão Geral da Campanha
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Uma visão completa do estado atual da sua aventura bíblica
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                🏰 {activeCampaign.name}
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400">
+                Uma visão completa do estado atual da sua aventura bíblica
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handleEndCampaign}
+                disabled={isEndingCampaign}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors duration-200 flex items-center gap-2"
+              >
+                {isEndingCampaign ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Encerrando...
+                  </>
+                ) : (
+                  <>
+                    🏁 Encerrar Campanha
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Linha 2: Mapa + Centro de Rolagem */}
@@ -33,9 +163,9 @@ export default function CampaignOverview({ characters, enemies }: CampaignOvervi
                 �️ Mapa da Campanha
               </h2>
               <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                <SquareMapGenerator size={5} />
+                <SquareMapGenerator size={activeCampaign.map_size} seed={activeCampaign.map_seed} characters={characters} compact={true} />
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
-                  Mapa procedural • Clique para interagir
+                  Mapa procedural • Clique para interagir • Personagens em azul
                 </p>
               </div>
             </div>
@@ -219,7 +349,9 @@ export default function CampaignOverview({ characters, enemies }: CampaignOvervi
                       </div>
                     </div>
 
-                    <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">Local: {((char as any).location) ?? '—'}</div>
+                    <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                      Local: {char.location ? `(${char.location.x}, ${char.location.y})` : '—'}
+                    </div>
 
                     <div className="mt-3 flex items-center justify-between">
                       <div className="flex gap-2">

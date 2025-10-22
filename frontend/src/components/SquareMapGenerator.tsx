@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import type { Character } from '../types';
 
 // Tipos para coordenadas quadradas
 interface SquareCoordinate {
@@ -70,11 +71,13 @@ const TERRAIN_ICONS: Record<TerrainType, React.ReactNode> = {
 interface HexMapGeneratorProps {
   size?: number;
   seed?: number;
+  characters?: Character[];
+  compact?: boolean; // quando true, renderiza somente o mapa (modo campanha)
 }
 
-export default function SquareMapGenerator({ size = 10, seed = Math.random() }: HexMapGeneratorProps) {
-  const [mapSize, setMapSize] = useState(size);
-  const [currentSeed, setCurrentSeed] = useState(seed);
+export default function SquareMapGenerator({ size = 10, seed = Math.random(), characters = [], compact = false }: HexMapGeneratorProps) {
+  const [mapSize, setMapSize] = useState<number>(size);
+  const [currentSeed, setCurrentSeed] = useState<number>(seed);
   // Estado para célula selecionada
   const [selectedCell, setSelectedCell] = useState<{ x: number; y: number } | null>(null);
   // Zoom e Pan
@@ -175,85 +178,95 @@ export default function SquareMapGenerator({ size = 10, seed = Math.random() }: 
     } as unknown as { x:number; y:number; width:number; height:number; actualWidth:number; actualHeight:number; cols:number; rows:number };
   }, [coords]);
 
-  // Gerar novo mapa
+  // Sincroniza props seed/size com o estado interno para manter paridade determinística
+  useEffect(() => {
+    setCurrentSeed(seed);
+  }, [seed]);
+
+  useEffect(() => {
+    setMapSize(size);
+  }, [size]);
+
+  // Handler para gerar um novo mapa (novo seed)
   const generateNewMap = () => {
     setCurrentSeed(Math.random());
   };
 
   return (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-      <h2 className="text-2xl font-semibold mb-6 text-gray-900 dark:text-white text-center">
-        🏔️ Gerador de Mapas Quadrados
-      </h2>
+      {/* Header, controles e legenda são ocultados em modo compact */}
+      {!compact && (
+        <>
+          <h2 className="text-2xl font-semibold mb-6 text-gray-900 dark:text-white text-center">
+            🏔️ Gerador de Mapas Quadrados
+          </h2>
 
-      {/* Controles */}
-      <div className="mb-6 flex flex-wrap gap-4 items-center justify-center">
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Tamanho:
-          </label>
-          <select
-            value={mapSize}
-            onChange={(e) => setMapSize(parseInt(e.target.value))}
-            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
-          >
-            <option value={3}>Pequeno (3)</option>
-            <option value={5}>Médio (5)</option>
-            <option value={7}>Grande (7)</option>
-            <option value={10}>Enorme (10)</option>
-            <option value={15}>Gigante (15)</option>
-            <option value={20}>Colossal (20)</option>
-          </select>
-        </div>
-
-        <button
-          onClick={generateNewMap}
-          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md font-medium transition-colors"
-        >
-          🎲 Gerar Novo Mapa
-        </button>
-
-        {/* Zoom Controls */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setZoom(z => Math.min(z + 0.2, 5))}
-            className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded-md font-bold text-lg"
-            title="Zoom In"
-          >+
-          </button>
-          <span className="text-sm text-gray-700 dark:text-gray-300">Zoom: {zoom.toFixed(1)}x</span>
-          <button
-            onClick={() => setZoom(z => Math.max(z - 0.2, 0.2))}
-            className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded-md font-bold text-lg"
-            title="Zoom Out"
-          >−
-          </button>
-          <button
-            onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}
-            className="bg-gray-500 hover:bg-gray-700 text-white px-2 py-1 rounded-md font-bold text-sm"
-            title="Resetar Zoom e Posição"
-          >Resetar</button>
-        </div>
-      </div>
-
-      {/* Legenda com ícones SVG */}
-      <div className="mb-6">
-        <h3 className="text-lg font-medium mb-3 text-gray-900 dark:text-white">Legenda:</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
-          {Object.keys(TERRAIN_CONFIGS).map(type => (
-            <div key={type} className="flex items-center gap-2">
-              <svg width={24} height={24} viewBox="0 0 1 1" style={{ background: TERRAIN_CONFIGS[type as TerrainType].color, borderRadius: 4, border: '1px solid #ccc' }}>
-                {TERRAIN_ICONS[type as TerrainType]}
-              </svg>
-              <span className="text-sm text-gray-700 dark:text-gray-300">
-                {TERRAIN_CONFIGS[type as TerrainType].name}
-              </span>
+          {/* Controles */}
+          <div className="mb-6 flex flex-wrap gap-4 items-center justify-center">
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Tamanho:</label>
+              <select
+                value={mapSize}
+                onChange={(e) => setMapSize(parseInt(e.target.value))}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+              >
+                <option value={3}>Pequeno (3)</option>
+                <option value={5}>Médio (5)</option>
+                <option value={7}>Grande (7)</option>
+                <option value={10}>Enorme (10)</option>
+                <option value={15}>Gigante (15)</option>
+                <option value={20}>Colossal (20)</option>
+              </select>
             </div>
-          ))}
-        </div>
-      </div>
 
-      {/* Mapa SVG */}
+            <button
+              onClick={generateNewMap}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md font-medium transition-colors"
+            >
+              🎲 Gerar Novo Mapa
+            </button>
+
+            {/* Zoom Controls */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setZoom(z => Math.min(z + 0.2, 5))}
+                className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded-md font-bold text-lg"
+                title="Zoom In"
+              >+
+              </button>
+              <span className="text-sm text-gray-700 dark:text-gray-300">Zoom: {zoom.toFixed(1)}x</span>
+              <button
+                onClick={() => setZoom(z => Math.max(z - 0.2, 0.2))}
+                className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded-md font-bold text-lg"
+                title="Zoom Out"
+              >−
+              </button>
+              <button
+                onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}
+                className="bg-gray-500 hover:bg-gray-700 text-white px-2 py-1 rounded-md font-bold text-sm"
+                title="Resetar Zoom e Posição"
+              >Resetar</button>
+            </div>
+          </div>
+
+          {/* Legenda com ícones SVG */}
+          <div className="mb-6">
+            <h3 className="text-lg font-medium mb-3 text-gray-900 dark:text-white">Legenda:</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
+              {Object.keys(TERRAIN_CONFIGS).map(type => (
+                <div key={type} className="flex items-center gap-2">
+                  <svg width={24} height={24} viewBox="0 0 1 1" style={{ background: TERRAIN_CONFIGS[type as TerrainType].color, borderRadius: 4, border: '1px solid #ccc' }}>
+                    {TERRAIN_ICONS[type as TerrainType]}
+                  </svg>
+                  <span className="text-sm text-gray-700 dark:text-gray-300">{TERRAIN_CONFIGS[type as TerrainType].name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Mapa SVG (sempre mostrado, também em modo compact) */}
       <div className="flex justify-center w-full select-none">
         <svg
           width="100%"
@@ -375,7 +388,22 @@ export default function SquareMapGenerator({ size = 10, seed = Math.random() }: 
         </svg>
       </div>
 
-      {/* Informações do Mapa */}
+      {/* Personagens no mapa (exibido também em modo compact) */}
+      <div className="mt-4">
+        <h3 className="text-lg font-medium mb-2 text-gray-900 dark:text-white">Personagens no Mapa:</h3>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+          {characters.filter(char => char.location).map((char) => (
+            <div key={char.id} className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded">
+              <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                {char.name.charAt(0).toUpperCase()}
+              </div>
+              <span className="text-sm text-gray-900 dark:text-white">{char.name} ({char.location?.x}, {char.location?.y})</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Informações do Mapa e célula selecionada (exibido também em modo compact) */}
       <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
         <p>Mapa quadrado com {hexMap.length} quadrados • Seed: {currentSeed.toFixed(4)}</p>
         <p className="mt-1">
