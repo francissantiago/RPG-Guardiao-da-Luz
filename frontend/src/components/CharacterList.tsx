@@ -4,6 +4,9 @@ interface CharacterListProps {
   characters: Character[];
   selectedCharacter: Character | null;
   onSelectCharacter: (char: Character) => void;
+  campaignSeed?: number | undefined;
+  mapSize?: number | undefined;
+  onStep?: (id: number, dx: number, dy: number) => void | Promise<void>;
 }
 
 export default function CharacterList({ characters, selectedCharacter, onSelectCharacter }: CharacterListProps) {

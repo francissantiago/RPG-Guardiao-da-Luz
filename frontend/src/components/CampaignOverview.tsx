@@ -14,6 +14,7 @@ interface CampaignOverviewProps {
   selectedCharacter?: Character | null;
   onCharacterMoved?: (updated: Character) => void;
   onStep?: (id: number, dx: number, dy: number) => void;
+  onSelectCharacter?: (char: Character) => void;
 }
 
 export default function CampaignOverview({ characters, enemies, activeCampaign, onCreateCampaign, onEndCampaign, selectedCharacter, onCharacterMoved, onStep, onSelectCharacter }: CampaignOverviewProps) {
@@ -175,12 +176,7 @@ export default function CampaignOverview({ characters, enemies, activeCampaign, 
                   onCharacterMoved={onCharacterMoved}
                   campaignSeed={activeCampaign.map_seed}
                   campaignSize={activeCampaign.map_size}
-                  onSelectCharacter={(char) => {
-                    // repassar seleção para o parent se disponível
-                    if (typeof (onCharacterMoved as any) === 'function') {
-                      // opcional: notificar seleção via onCharacterMoved mas não alterar dados
-                    }
-                  }}
+                  onSelectCharacter={onSelectCharacter}
                   onStep={onStep}
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">

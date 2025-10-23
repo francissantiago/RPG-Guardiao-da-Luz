@@ -675,6 +675,7 @@ function App() {
               setSelectedCharacter(prev => prev && prev.id === updated.id ? { ...prev, location: updated.location } : prev);
             }}
                 onStep={handleStep}
+                onSelectCharacter={handleSelectCharacter}
                 // passar seleção para a campanha (SquareMapGenerator -> CharacterList -> App)
                 // CampaignOverview já encaminha onSelectCharacter para SquareMapGenerator
                 
