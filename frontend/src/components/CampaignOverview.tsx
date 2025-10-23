@@ -13,9 +13,10 @@ interface CampaignOverviewProps {
   onEndCampaign: () => Promise<void>;
   selectedCharacter?: Character | null;
   onCharacterMoved?: (updated: Character) => void;
+  onStep?: (id: number, dx: number, dy: number) => void;
 }
 
-export default function CampaignOverview({ characters, enemies, activeCampaign, onCreateCampaign, onEndCampaign, selectedCharacter, onCharacterMoved }: CampaignOverviewProps) {
+export default function CampaignOverview({ characters, enemies, activeCampaign, onCreateCampaign, onEndCampaign, selectedCharacter, onCharacterMoved, onStep, onSelectCharacter }: CampaignOverviewProps) {
   const dice = useDiceRoller(characters);
   const [isCreatingCampaign, setIsCreatingCampaign] = useState(false);
   const [campaignName, setCampaignName] = useState('');
@@ -165,7 +166,23 @@ export default function CampaignOverview({ characters, enemies, activeCampaign, 
                 �️ Mapa da Campanha
               </h2>
               <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                <SquareMapGenerator size={activeCampaign.map_size} seed={activeCampaign.map_seed} characters={characters} compact={true} selectedCharacter={selectedCharacter} onCharacterMoved={onCharacterMoved} />
+                <SquareMapGenerator
+                  size={activeCampaign.map_size}
+                  seed={activeCampaign.map_seed}
+                  characters={characters}
+                  compact={true}
+                  selectedCharacter={selectedCharacter}
+                  onCharacterMoved={onCharacterMoved}
+                  campaignSeed={activeCampaign.map_seed}
+                  campaignSize={activeCampaign.map_size}
+                  onSelectCharacter={(char) => {
+                    // repassar seleção para o parent se disponível
+                    if (typeof (onCharacterMoved as any) === 'function') {
+                      // opcional: notificar seleção via onCharacterMoved mas não alterar dados
+                    }
+                  }}
+                  onStep={onStep}
+                />
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
                   Mapa procedural • Clique para interagir • Personagens em azul
                 </p>
@@ -268,126 +285,9 @@ export default function CampaignOverview({ characters, enemies, activeCampaign, 
           </div>
         </div>
 
-        {/* Linha 3: Personagens Horizontalmente */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-            👥 Personagens ({characters.length})
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {characters.map((char) => (
-              <div key={char.id} className="p-4 rounded-lg bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors shadow-sm" style={{ minWidth: '240px' }}>
-                <div className="flex items-start gap-4">
-                  <div className="w-14 h-14 flex-shrink-0 rounded-full flex items-center justify-center font-bold text-lg" style={{ background: (char.color ?? '#2563eb'), color: '#ffffff' }}>
-                    {char.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <p className="font-semibold text-lg text-gray-900 dark:text-white">{char.name}</p>
-                      <span className="text-sm bg-gray-200 dark:bg-gray-600 px-2 py-1 rounded">Nv. {char.level}</span>
-                    </div>
-
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-gray-600 dark:text-gray-300">
-                      <div>
-                        <div className="font-medium">PC</div>
-                        <div className="mt-1">
-                          {(() => {
-                            const maxPc = Math.min(3000, (char.forca + char.destreza + (char.weapon_attr === 'forca' || char.weapon_attr === 'destreza' ? char.weapon_bonus : 0)) * 75);
-                            const currentPc = (char as any).current_pc ?? maxPc;
-                            const pcPercent = Math.round((currentPc / maxPc) * 100);
-                            return (
-                              <div className="relative flex-1 h-3 rounded" style={{ background: `linear-gradient(to right, #eab308 0%, #eab308 ${pcPercent}%, #e5e7eb ${pcPercent}%, #e5e7eb 100%)` }}>
-                                <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-white">{currentPc}/{maxPc}</span>
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="font-medium">PV</div>
-                        <div className="mt-1">
-                          {(() => {
-                            const maxPv = Math.min(5000, (char.constituicao + (char.weapon_attr === 'constituicao' ? char.weapon_bonus : 0)) * 250);
-                            const currentPv = char.current_pv ?? maxPv;
-                            const pvPercent = Math.round((currentPv / maxPv) * 100);
-                            return (
-                              <div className="relative flex-1 h-3 rounded" style={{ background: `linear-gradient(to right, #ef4444 0%, #ef4444 ${pvPercent}%, #e5e7eb ${pvPercent}%, #e5e7eb 100%)` }}>
-                                <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-white">{currentPv}/{maxPv}</span>
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="font-medium">PE</div>
-                        <div className="mt-1">
-                          {(() => {
-                            const maxPe = Math.min(2000, ((char.inteligencia + char.sabedoria + char.carisma + (['inteligencia', 'sabedoria', 'carisma'].includes(char.weapon_attr) ? char.weapon_bonus : 0)) * 33));
-                            const currentPe = char.current_pe ?? maxPe;
-                            const pePercent = Math.round((currentPe / maxPe) * 100);
-                            return (
-                              <div className="relative flex-1 h-3 rounded" style={{ background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${pePercent}%, #e5e7eb ${pePercent}%, #e5e7eb 100%)` }}>
-                                <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-white">{currentPe}/{maxPe}</span>
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="font-medium">XP</div>
-                        <div className="mt-1">
-                          {(() => {
-                            const requiredXp = 1000 * char.level;
-                            const xpPercent = Math.min(100, Math.round((char.xp / requiredXp) * 100));
-                            return (
-                              <div className="relative flex-1 h-3 rounded" style={{ background: `linear-gradient(to right, #10b981 0%, #10b981 ${xpPercent}%, #ffffff ${xpPercent}%, #ffffff 100%)` }}>
-                                <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-gray-900">{char.xp}/{requiredXp}</span>
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                      Local: {char.location ? `(${char.location.x}, ${char.location.y})` : '—'}
-                    </div>
-
-                    <div className="mt-3 flex items-center justify-between">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => { dice.setSelectedPlayerForAction(String(char.id)); dice.executeQuickAction('strength'); }}
-                          className="px-2 py-1 rounded-md bg-red-500 hover:bg-red-600 text-white text-xs"
-                        >
-                          💪 Força
-                        </button>
-                        <button
-                          onClick={() => { dice.setSelectedPlayerForAction(String(char.id)); dice.executeQuickAction('dexterity'); }}
-                          className="px-2 py-1 rounded-md bg-orange-500 hover:bg-orange-600 text-white text-xs"
-                        >
-                          🏃 Destreza
-                        </button>
-                        <button
-                          onClick={() => { dice.setSelectedPlayerForAction(String(char.id)); dice.executeQuickAction('constitution'); }}
-                          className="px-2 py-1 rounded-md bg-green-500 hover:bg-green-600 text-white text-xs"
-                        >
-                          ❤️ Constituição
-                        </button>
-                      </div>
-
-                      <div className="text-xxs text-gray-400 text-right">
-                        <div className="text-xs font-medium">Batalha (PVP/PVE)</div>
-                        <div className="text-[10px]">Em desenvolvimento</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        {/* Substituído: os cards completos de personagens agora são exibidos dentro de `SquareMapGenerator` usando `CharacterList`.
+            Mantemos aqui um link rápido para abrir a visão completa se necessário. */}
+        {/* Removido bloco informativo: os cards agora estão diretamente abaixo do mapa via CharacterList */}
 
         {/* Linha 4: Inimigos */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">

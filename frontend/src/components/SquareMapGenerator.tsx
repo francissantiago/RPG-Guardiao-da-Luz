@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useToast } from './ToastProvider';
 import type { Character } from '../types';
+import CampaignCharacterList from './CampaignCharacterList';
 
 // Tipos para coordenadas quadradas
 interface SquareCoordinate {
@@ -76,9 +77,14 @@ interface HexMapGeneratorProps {
   compact?: boolean; // quando true, renderiza somente o mapa (modo campanha)
   selectedCharacter?: Character | null;
   onCharacterMoved?: (updated: Character) => void;
+  // props adicionais para integrar a lista completa de personagens abaixo do mapa
+  campaignSeed?: number;
+  campaignSize?: number;
+  onSelectCharacter?: (char: Character) => void;
+  onStep?: (id: number, dx: number, dy: number) => void;
 }
 
-export default function SquareMapGenerator({ size = 10, seed = Math.random(), characters = [], compact = false, selectedCharacter = null, onCharacterMoved }: HexMapGeneratorProps) {
+export default function SquareMapGenerator({ size = 10, seed = Math.random(), characters = [], compact = false, selectedCharacter = null, onCharacterMoved, campaignSeed, campaignSize, onSelectCharacter, onStep }: HexMapGeneratorProps) {
   const toast = (() => {
     try {
       return useToast();
@@ -565,37 +571,21 @@ export default function SquareMapGenerator({ size = 10, seed = Math.random(), ch
         </svg>
       </div>
 
-      {/* Personagens no mapa (exibido também em modo compact) */}
-      <div className="mt-4">
-  <h3 className="text-lg font-medium mb-2 text-gray-100 dark:text-white">Personagens no Mapa:</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-              {characters.filter(char => char.location).map((char) => {
-            const color = char.color ?? '#2563eb';
-            // container background: usar a cor com alpha pequena (hex + alpha) se for hex de 7 chars
-            let containerBg = 'transparent';
-            if (/^#([0-9a-f]{6})$/i.test(color)) containerBg = `${color}22`; // baixa opacidade
-            const locX = char.location!.x;
-            const locY = char.location!.y;
-            const isThisSelected = selectedCell && selectedCell.x === locX && selectedCell.y === locY;
-            return (
-              <div
-                key={char.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => setSelectedCell(prev => (prev && prev.x === locX && prev.y === locY) ? null : { x: locX, y: locY })}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedCell(prev => (prev && prev.x === locX && prev.y === locY) ? null : { x: locX, y: locY }); }}
-                className={`flex items-center gap-2 p-2 rounded ${isThisSelected ? 'ring-2 ring-offset-1 ring-white/30' : ''} cursor-pointer`}
-                style={{ background: containerBg }}
-              >
-                <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: color, color: '#ffffff', boxShadow: '0 0 0 1px rgba(0,0,0,0.12) inset' }}>
-                  {char.name.charAt(0).toUpperCase()}
-                </div>
-                <span className={`text-sm text-gray-100`}>{char.name} ({locX}, {locY})</span>
-              </div>
-            );
-          })}
+      {/* Personagens no mapa: substituir a lista compacta por `CharacterList` para visão completa e controles */}
+        <div className="mt-4">
+          <CampaignCharacterList
+            characters={characters}
+            selectedCharacter={selectedCharacter}
+            onSelectCharacter={(char) => {
+              if (typeof onSelectCharacter === 'function') onSelectCharacter(char);
+              if (char.location) setSelectedCell({ x: char.location.x, y: char.location.y });
+            }}
+            campaignSeed={campaignSeed ?? seed}
+            mapSize={campaignSize ?? mapSize}
+            onStep={onStep}
+            onTeleport={onCharacterMoved}
+          />
         </div>
-      </div>
 
       {/* Informações do Mapa e célula selecionada (exibido também em modo compact) */}
       <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">

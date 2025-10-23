@@ -127,6 +127,27 @@ function App() {
     }
   };
 
+  const handleStep = async (id: number, dx: number, dy: number) => {
+    try {
+      const res = await fetch(`http://localhost:3001/characters/${id}/step`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dx, dy }) });
+      const data = await res.json();
+      if (res.ok) {
+        await fetchCharacters();
+        try { toast.show('Movimento realizado', 'success'); } catch {}
+      } else {
+        try { toast.show(data.error || 'Movimento inválido', 'error'); } catch {}
+      }
+    } catch (e) {
+      console.error('Erro ao movimentar personagem', e);
+      try { toast.show('Erro de comunicação', 'error'); } catch {}
+    }
+  };
+
+  const handleSelectCharacter = (char: Character) => {
+    setSelectedCharacter(char);
+    setEditedCharacter({ ...char });
+  };
+
   const fetchEnemies = async () => {
     try {
       const response = await fetch('http://localhost:3001/enemies');
@@ -640,7 +661,7 @@ function App() {
             // atualizar seleção
             setSelectedCharacter(prev => prev && prev.id === updated.id ? { ...prev, location: updated.location } : prev);
           }} />
-        ) : currentView === 'campaign' ? (
+            ) : currentView === 'campaign' ? (
           <CampaignOverview 
             characters={characters} 
             enemies={enemies} 
@@ -653,13 +674,20 @@ function App() {
               setCharacters(prev => prev.map(c => c.id === updated.id ? { ...c, location: updated.location } : c));
               setSelectedCharacter(prev => prev && prev.id === updated.id ? { ...prev, location: updated.location } : prev);
             }}
+                onStep={handleStep}
+                // passar seleção para a campanha (SquareMapGenerator -> CharacterList -> App)
+                // CampaignOverview já encaminha onSelectCharacter para SquareMapGenerator
+                
           />
-        ) : (
+            ) : (
           <div className="h-full grid grid-cols-[0.5fr_1fr_1fr] gap-4">
             <CharacterList
               characters={characters}
               selectedCharacter={selectedCharacter}
-              onSelectCharacter={(char: Character) => { setSelectedCharacter(char); setEditedCharacter({ ...char }); }}
+                  onSelectCharacter={handleSelectCharacter}
+              campaignSeed={activeCampaign?.map_seed}
+              mapSize={activeCampaign?.map_size}
+              onStep={handleStep}
             />
             <CharacterDetails
               editedCharacter={editedCharacter}
