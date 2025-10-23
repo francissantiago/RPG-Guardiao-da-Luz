@@ -10,6 +10,7 @@ interface Props {
   onSelectCharacter?: (c: Character) => void;
   onStep?: (id: number, dx: number, dy: number) => void;
   onTeleport?: (updated: Character) => void;
+  onBindCharacter?: (charId: number) => void;
 }
 
 const noise = (x: number, y: number, seed: number = 0) => {
@@ -32,7 +33,7 @@ const getTerrainType = (x: number, y: number, seed: number, mapSizeLocal: number
   return 'grass';
 };
 
-export default function CampaignCharacterList({ characters, campaignSeed, mapSize, selectedCharacter, onSelectCharacter, onStep, onTeleport }: Props) {
+export default function CampaignCharacterList({ characters, campaignSeed, mapSize, selectedCharacter, onSelectCharacter, onStep, onTeleport, onBindCharacter }: Props) {
   const toast = (() => { try { return useToast(); } catch { return null; } })();
   const [teleportFor, setTeleportFor] = useState<number | null>(null);
   const [tx, setTx] = useState<number>(0);
@@ -66,9 +67,10 @@ export default function CampaignCharacterList({ characters, campaignSeed, mapSiz
         {visibleChars.map((c) => {
           const x = c.location!.x;
           const y = c.location!.y;
+          const inCampaign = !!c.campaign_id;
           const isSelected = selectedCharacter && selectedCharacter.id === c.id;
 
-          const validByDir = directions.map(d => ({ ...d, valid: isWalkable(x + d.dx, y + d.dy) && !isOccupied(x + d.dx, y + d.dy) }));
+          const validByDir = directions.map(d => ({ ...d, valid: inCampaign && isWalkable(x + d.dx, y + d.dy) && !isOccupied(x + d.dx, y + d.dy) }));
 
           // compute compact stats similar to CharacterList
           const pcVal = Math.min(3000, (c.forca + c.destreza + (c.weapon_attr === 'forca' || c.weapon_attr === 'destreza' ? c.weapon_bonus : 0)) * 75);
@@ -124,11 +126,15 @@ export default function CampaignCharacterList({ characters, campaignSeed, mapSiz
 
               <div className="flex flex-wrap gap-1 mt-2 justify-center">
                 {validByDir.map(d => (
-                  <button key={d.name} onClick={(e) => { e.stopPropagation(); d.valid && onStep?.(c.id, d.dx, d.dy); }} disabled={!d.valid} className={`w-7 h-7 text-lg flex items-center justify-center rounded ${d.valid ? 'bg-blue-500 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`} title={d.name}>
+                  <button key={d.name} onClick={(e) => { e.stopPropagation(); if (!inCampaign) { try { toast?.show('Personagem não vinculado a uma campanha', 'error'); } catch {} return; } d.valid && onStep?.(c.id, d.dx, d.dy); }} disabled={!d.valid} className={`w-7 h-7 text-lg flex items-center justify-center rounded ${d.valid ? 'bg-blue-500 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`} title={inCampaign ? d.name : 'Fora da campanha'}>
                     {d.s}
                   </button>
                 ))}
-                <button onClick={(e) => { e.stopPropagation(); if (teleportFor === c.id) setTeleportFor(null); else { setTeleportFor(c.id); setTx(c.location!.x); setTy(c.location!.y); } }} className="w-7 h-7 text-lg flex items-center justify-center rounded bg-purple-600 text-white" title="Teleportar">✦</button>
+                {inCampaign ? (
+                  <button onClick={(e) => { e.stopPropagation(); if (teleportFor === c.id) setTeleportFor(null); else { setTeleportFor(c.id); setTx(c.location!.x); setTy(c.location!.y); } }} className={`w-7 h-7 text-lg flex items-center justify-center rounded bg-purple-600 text-white`} title={'Teleportar'}>✦</button>
+                ) : (
+                  <button onClick={(e) => { e.stopPropagation(); try { toast?.show('Personagem sem campanha — vincule-o para habilitar movimentos', 'info'); } catch {} }} className={`w-7 h-7 text-sm flex items-center justify-center rounded bg-yellow-400 text-white`} title={'Sem campanha'}>Vinc.</button>
+                )}
               </div>
 
               {teleportFor === c.id && (
@@ -137,6 +143,7 @@ export default function CampaignCharacterList({ characters, campaignSeed, mapSiz
                   <input type="number" value={ty} onChange={(e) => setTy(Number(e.target.value))} className="w-16 px-2 py-1 rounded border bg-white dark:bg-gray-700 text-sm" />
                   <button onClick={async (ev) => {
                     ev.stopPropagation();
+                    if (!inCampaign) { try { toast?.show('Personagem não vinculado a uma campanha', 'error'); } catch {} return; }
                     try {
                       const res = await fetch(`http://localhost:3001/characters/${c.id}/teleport`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: { x: tx, y: ty } }) });
                       const data = await res.json();
@@ -162,6 +169,11 @@ export default function CampaignCharacterList({ characters, campaignSeed, mapSiz
                 <div>Int: {c.inteligencia}</div>
                 <div>Sab: {c.sabedoria}</div>
                 <div>Car: {c.carisma}</div>
+              {!inCampaign && (
+                <div className="w-full flex justify-center mt-2">
+                  <button onClick={(e) => { e.stopPropagation(); onBindCharacter?.(c.id); }} className="px-2 py-1 rounded bg-indigo-500 text-white text-sm">Vincular à campanha</button>
+                </div>
+              )}
               </div>
             </div>
           );

@@ -82,9 +82,10 @@ interface HexMapGeneratorProps {
   campaignSize?: number;
   onSelectCharacter?: (char: Character) => void;
   onStep?: (id: number, dx: number, dy: number) => void;
+  onBindCharacter?: (charId: number) => void;
 }
 
-export default function SquareMapGenerator({ size = 10, seed = Math.random(), characters = [], compact = false, selectedCharacter = null, onCharacterMoved, campaignSeed, campaignSize, onSelectCharacter, onStep }: HexMapGeneratorProps) {
+export default function SquareMapGenerator({ size = 10, seed = Math.random(), characters = [], compact = false, selectedCharacter = null, onCharacterMoved, campaignSeed, campaignSize, onSelectCharacter, onStep, onBindCharacter }: HexMapGeneratorProps) {
   const toast = (() => {
     try {
       return useToast();
@@ -584,6 +585,7 @@ export default function SquareMapGenerator({ size = 10, seed = Math.random(), ch
             mapSize={campaignSize ?? mapSize}
             onStep={onStep}
             onTeleport={onCharacterMoved}
+            onBindCharacter={onBindCharacter}
           />
         </div>
 

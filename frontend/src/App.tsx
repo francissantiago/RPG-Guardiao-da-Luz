@@ -317,6 +317,65 @@ function App() {
     }
   };
 
+  const bindCharacterToCampaign = async (charId: number) => {
+    if (!activeCampaign) {
+      try { toast.show('Nenhuma campanha ativa', 'error'); } catch {}
+      return;
+    }
+
+    const mapSize = activeCampaign.map_size || 5;
+    const mapWidth = mapSize * 6;
+    const mapHeight = mapSize * 2;
+    const location_x = Math.floor(mapWidth / 2);
+    const location_y = Math.floor(mapHeight / 2);
+
+    const char = characters.find(c => c.id === charId);
+    if (!char) {
+      try { toast.show('Personagem não encontrado', 'error'); } catch {}
+      return;
+    }
+
+    // Build payload using existing character fields to avoid overwriting with undefined
+    const payload = {
+      name: char.name,
+      race: (char as any).race,
+      level: char.level,
+      forca: char.forca,
+      destreza: char.destreza,
+      constituicao: char.constituicao,
+      inteligencia: char.inteligencia,
+      sabedoria: char.sabedoria,
+      carisma: char.carisma,
+      pontos_disponiveis: (char as any).pontos_disponiveis ?? 70,
+      xp: char.xp ?? 0,
+      weapon_name: char.weapon_name ?? '',
+      weapon_attr: char.weapon_attr ?? '',
+      weapon_bonus: char.weapon_bonus ?? 0,
+      color: char.color ?? null,
+      current_pv: char.current_pv ?? null,
+      current_pe: char.current_pe ?? null,
+      current_pc: char.current_pc ?? null,
+      location_x,
+      location_y,
+      campaign_id: activeCampaign.id,
+      currency: (char as any).currency ?? 300,
+    } as any;
+
+    try {
+      const res = await fetch(`http://localhost:3001/characters/${charId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (res.ok) {
+        await fetchCharacters();
+        try { toast.show('Personagem vinculado à campanha e posicionado', 'success'); } catch {}
+      } else {
+        const data = await res.json().catch(() => ({}));
+        try { toast.show(data.error || 'Erro ao vincular personagem', 'error'); } catch {}
+      }
+    } catch (err) {
+      console.error('Erro ao vincular personagem:', err);
+      try { toast.show('Erro de conexão ao vincular personagem', 'error'); } catch {}
+    }
+  };
+
   const createEnemy = async (enemyData: Omit<Enemy, 'id' | 'current_pv' | 'current_pc' | 'current_pe'>) => {
     try {
       const response = await fetch('http://localhost:3001/enemies', {
@@ -676,6 +735,7 @@ function App() {
             }}
                 onStep={handleStep}
                 onSelectCharacter={handleSelectCharacter}
+                onBindCharacter={bindCharacterToCampaign}
                 // passar seleção para a campanha (SquareMapGenerator -> CharacterList -> App)
                 // CampaignOverview já encaminha onSelectCharacter para SquareMapGenerator
                 

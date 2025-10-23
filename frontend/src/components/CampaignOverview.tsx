@@ -15,9 +15,10 @@ interface CampaignOverviewProps {
   onCharacterMoved?: (updated: Character) => void;
   onStep?: (id: number, dx: number, dy: number) => void;
   onSelectCharacter?: (char: Character) => void;
+  onBindCharacter?: (charId: number) => void;
 }
 
-export default function CampaignOverview({ characters, enemies, activeCampaign, onCreateCampaign, onEndCampaign, selectedCharacter, onCharacterMoved, onStep, onSelectCharacter }: CampaignOverviewProps) {
+export default function CampaignOverview({ characters, enemies, activeCampaign, onCreateCampaign, onEndCampaign, selectedCharacter, onCharacterMoved, onStep, onSelectCharacter, onBindCharacter }: CampaignOverviewProps) {
   const dice = useDiceRoller(characters);
   const [isCreatingCampaign, setIsCreatingCampaign] = useState(false);
   const [campaignName, setCampaignName] = useState('');
@@ -177,6 +178,7 @@ export default function CampaignOverview({ characters, enemies, activeCampaign, 
                   campaignSeed={activeCampaign.map_seed}
                   campaignSize={activeCampaign.map_size}
                   onSelectCharacter={onSelectCharacter}
+                  onBindCharacter={onBindCharacter}
                   onStep={onStep}
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
