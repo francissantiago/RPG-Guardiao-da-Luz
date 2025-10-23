@@ -108,8 +108,10 @@ function App() {
         });
         const inventory = {
           equipped,
+          // include character_items id (ci.id) as character_item_id so frontend can call equip/unequip
           items: itemsData.items.filter((ci: any) => !ci.equipped_slot).map((ci: any) => ({
-            id: ci.item_id,
+            character_item_id: ci.id,
+            item_id: ci.item_id,
             name: ci.name,
             type: ci.type,
             bonus: ci.bonus_attr ? { attr: ci.bonus_attr, value: ci.bonus_value } : undefined,
@@ -664,7 +666,7 @@ function App() {
               setEditedCharacter={setEditedCharacter}
               handleUpdateCharacter={handleUpdateCharacter}
             />
-            <Inventory selectedCharacter={selectedCharacter} />
+            <Inventory selectedCharacter={selectedCharacter} refreshCharacters={fetchCharacters} />
           </div>
         )}
       </main>

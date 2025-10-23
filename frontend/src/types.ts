@@ -46,6 +46,8 @@ export interface Campaign {
 
 export interface Item {
   id: number;
+  // character_item_id é um id da linha na tabela character_items quando o item pertence a um personagem
+  character_item_id?: number;
   name: string;
   type: string;
   bonus?: {
